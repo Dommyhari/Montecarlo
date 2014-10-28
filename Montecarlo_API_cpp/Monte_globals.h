@@ -70,7 +70,6 @@ extern ivec3d mc_global_cell_dim;                                            // 
 // M: calc_mc_cpu_box()
 extern vec3d  mc_cpu_box_x,mc_cpu_box_y,mc_cpu_box_z;                        // cpu_box physical dimension method                      MC
 
-
 // same for all cpu--  domain decomposition -- in preliminary implementation (later changes for load balancing)
 
 //to be included suitable declaration to assign the following quantities
@@ -82,9 +81,9 @@ extern int ncells_stack; // no of cells per stack in a cpu
 
 // M: calc_block_dim() from rank 0
 
-extern int rows_block;     // no of rows in global domain
-extern int cols_block;     // no of cols in global domain
-extern int stacks_block;   // no of stacks in global domain
+extern int rows_block;     // no of rows in global computation domain
+extern int cols_block;     // no of cols in global computation domain
+extern int stacks_block;   // no of stacks in global computation domain
 
 // some global variables in c++ scope using containers-Vector
 

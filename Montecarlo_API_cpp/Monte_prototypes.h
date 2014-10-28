@@ -13,7 +13,7 @@
 
 // utility methods definition
 
-particle get_target_particle(long particle_id, int  cell_id);
+void update_particle(int  cell_id, particle ref_atom );
 
 void read_update_config (char* fname);
 

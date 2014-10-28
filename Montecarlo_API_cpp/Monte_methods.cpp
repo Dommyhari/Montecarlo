@@ -16,30 +16,41 @@
 
 using namespace std;
 
-particle get_target_particle(long particle_id, int cell_id){
+void update_particle( int  cell_id, particle ref_atom ){
+
+
+	   // method for updating particle attributes for the
+	   // given cell and particle id
 
 	   cellblock loc_obj;
 
 	   // get cell
-	   celltype res_cell, cell_obj = loc_obj.get_cell(cell_id) ;
+	   celltype  cell_obj = loc_obj.get_cell(cell_id) ;
+
+	   particle p_obj;
 
 	   // get particles count
 	   long p_count = cell_obj.get_nparticles();
 
+	   long loc_id = ref_atom.get_mynumber();
+
+	   // loop over particles in cell
 	   for ( long i=0; i<p_count; i++ ){
-		   if ( cell_obj.get_particle(i).get_mynumber() == particle_id) { res_cell = cell_obj.get_particle(i); }
-
+		   if ( cell_obj.get_particle(i).get_mynumber() == loc_id) { p_obj = cell_obj.get_particle(i); } // particle id matching
 	   }
-	   return res_cell;
-}
 
+	   // updating atom attributes
+	   p_obj.set_mytype(ref_atom.get_mytype());
+	   p_obj.set_myposition(ref_atom.get_myposition().x,ref_atom.get_myposition().y,ref_atom.get_myposition().z);
+	   p_obj.set_myvelocity(ref_atom.get_myvelocity().x,ref_atom.get_myvelocity().y,ref_atom.get_myvelocity().z);
+	   p_obj.set_myepot(ref_atom.get_myepot());
+
+}
 
 void read_update_config (char* fname){
 
-	/********************************************************************************
-	* method for reading current file configuration and updating particle attributes
-	* with in and across cpu process
-	*********************************************************************************/
+	// method for reading current file configuration and updating particle attributes
+	// with in and across cpu process
 
 	//----------------------------------------------//
 	//            1 - File reading part             //
@@ -63,6 +74,8 @@ void read_update_config (char* fname){
 
     char headerline[LIMIT];
 
+    cout<< " Reading simulation sphere file " << fname << endl;
+
     // crunch header part
     while (fin.get() == '#'){
           fin.getline(headerline,LIMIT,'\n');
@@ -71,30 +84,17 @@ void read_update_config (char* fname){
 
     while( !fin.eof()){ // end of file check
 
-        fin>>f_id;
-        fbuffer_id.push_back(f_id);
-        fin>>f_type;
-        fbuffer_type.push_back(f_type);
-        fin>>f_mass;
-        fbuffer_mass.push_back(f_mass);
-        fin>>f_posx;
-        fbuffer_pos_x.push_back(f_posx);
-        fin>>f_posy;
-        fbuffer_pos_y.push_back(f_posy);
-        fin>>f_posz;
-        fbuffer_pos_z.push_back(f_posz);
-
-        //** CHECK: NEED CONDITIONAL INCLUDE
-        fin>>f_velx;
-        fbuffer_vel_x.push_back(f_velx);
-        fin>>f_vely;
-        fbuffer_vel_y.push_back(f_vely);
-        fin>>f_velz;
-        fbuffer_vel_z.push_back(f_velz);
-        //****
-
-        fin>>f_epot;
-        fbuffer_epot.push_back(f_epot);
+    	// reading         // pushing
+        fin>>f_id;        fbuffer_id.push_back(f_id);
+        fin>>f_type;      fbuffer_type.push_back(f_type);
+        fin>>f_mass;      fbuffer_mass.push_back(f_mass);
+        fin>>f_posx;      fbuffer_pos_x.push_back(f_posx);
+        fin>>f_posy;      fbuffer_pos_y.push_back(f_posy);
+        fin>>f_posz;      fbuffer_pos_z.push_back(f_posz);
+        fin>>f_velx;      fbuffer_vel_x.push_back(f_velx);
+        fin>>f_vely;      fbuffer_vel_y.push_back(f_vely);
+        fin>>f_velz;      fbuffer_vel_z.push_back(f_velz);
+        fin>>f_epot;      fbuffer_epot.push_back(f_epot);
     }
 
     fin.clear(); // resetting bit states
@@ -110,6 +110,8 @@ void read_update_config (char* fname){
     cellblock loc_obj;
 
     particle atom;
+
+    cout<< "Updating particle attributes " << endl;
 
     for (int i=0; i< (fbuffer_id.size()-1); i++){
 
@@ -134,33 +136,33 @@ void read_update_config (char* fname){
 		// to get memory index of cell in cell list
 		int cell_index = cell_loc_coord.x + (cell_loc_coord.y * mc_cpu_cell_dim.x) + (cell_loc_coord.z * mc_cpu_cell_dim.x * mc_cpu_cell_dim.x);
 
-
 		long particle_id = fbuffer_id.at(i);
 
-		// get particle
-		atom =  get_target_particle( particle_id, cell_index);
-
-		// update particle attributes
+		// defining particle attributes
+		atom.set_mynumber(fbuffer_id.at(i));
 		atom.set_mytype(fbuffer_type.at(i));
 		atom.set_myposition(fbuffer_pos_x.at(i), fbuffer_pos_y.at(i), fbuffer_pos_z.at(i));
 		atom.set_myvelocity(fbuffer_vel_x.at(i),fbuffer_vel_y.at(i),fbuffer_vel_z.at(i));
-        // epot to be added
+		atom.set_myepot(fbuffer_epot.at(i));
 
-    }
+		// update particle
+		update_particle(cell_index,atom);
+
+
+    } // for loop
 
 }
 
 void construct_sphere(particle pobj, celltype cobj, char *fname){
 
-	//*******************************************************************
+	// Construct sphere around chosen particle and write the particles in (r_cut + r_sample) to configuration file
 	//NOTE: now hard coded for mc_nbcells=6 neighbors
-	//*******************************************************************
 
 	ivec3d temp_glob, temp_loc, temp_block ; // temporary holder for cell global coordinates
 
 	vec3d temp_pos, temp_vel, vec1, vec2;
 	long temp_id; int temp_type;            // temporary holder for particle attributes
-	double temp_mass, dist_check;
+	double temp_mass, temp_epot, dist_check;
 
 	char * filename = fname;                // file name as per simulation state from signature
 
@@ -169,15 +171,15 @@ void construct_sphere(particle pobj, celltype cobj, char *fname){
 	particle temp_part;
 	celltype sphere_cells[mc_nbcells]; // list of neighbor cells
 	cellblock loc_obj;
-	ofstream fout(filename, ios_base::out);
 
+	ofstream fout(filename, ios_base::out);
 
 	// manipulators settings
 	cout << fixed << right;
 
-    //********** loop over sphere cells array **************
+    //********** loop over Neighbor cells list **************
 
-	for(auto i=0; i<mc_nbcells; i++){
+	for(int i=0; i<mc_nbcells; i++){
 
           // getting nbl cells, cpu and cell address
 
@@ -212,6 +214,7 @@ void construct_sphere(particle pobj, celltype cobj, char *fname){
 		    	  //  temp_type   = buffer[k];
 		    	  //  temp_id     = buffer[k+size];
 		    	  //  temp_mass   = buffer[k+(size*2)];
+		    	  //  temp_epot   = buffer[k+(size*3)]; // NOTE: need to be verified
 		    	  //  temp_pos.x  = buffer[p_c++];
 		    	  //  temp_pos.y  = buffer[p_c++];
 		    	  //  temp_pos.z  = buffer[p_c++];
@@ -224,14 +227,13 @@ void construct_sphere(particle pobj, celltype cobj, char *fname){
 		          temp_part.set_mymass(temp_mass);
 		          temp_part.set_myposition(temp_pos.x,temp_pos.y,temp_pos.z);
 		          temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
+		          temp_part.set_myepot(temp_epot);
 
 		          // ----- cutoff check
 
 		          vec1 = pobj.get_myposition();
 		          vec2 = temp_part.get_myposition();
-
 		          dist_check = distance_vect(vec1,vec2);
-
 
 		          //**************************************************************
 		          //NOTE: to be updated in callee process to make dist_check
@@ -263,7 +265,7 @@ void construct_sphere(particle pobj, celltype cobj, char *fname){
 		    	   temp_mass  = loc_obj.get_cell(cell_index).get_particle(pcount).get_mymass();
 		    	   temp_pos   = loc_obj.get_cell(cell_index).get_particle(pcount).get_myposition();
 		    	   temp_vel   = loc_obj.get_cell(cell_index).get_particle(pcount).get_myvelocity();
-
+		    	   temp_epot  = loc_obj.get_cell(cell_index).get_particle(pcount).get_myepot();
 
 		    	   // pre-check before assignment
 
@@ -284,6 +286,8 @@ void construct_sphere(particle pobj, celltype cobj, char *fname){
 			    	   temp_part.set_mymass(temp_mass);
 			    	   temp_part.set_myposition(temp_pos.x,temp_pos.y,temp_pos.z);
 			    	   temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
+			    	   temp_part.set_myepot(temp_epot);
+
 
 			    	   sphere_cells[i].add_particle(temp_part);
 			       }
@@ -299,7 +303,7 @@ void construct_sphere(particle pobj, celltype cobj, char *fname){
 
 	      long my_number;
 	      int my_type;
-          double my_mass;
+          double my_mass, my_epot;
           vec3d my_pos, my_vel;
 
           cout<<" Sphere constructor writing to file : " << filename<<endl;
@@ -310,8 +314,8 @@ void construct_sphere(particle pobj, celltype cobj, char *fname){
         	  my_type    = sphere_cells[i].get_particle(fp).get_mytype();
         	  my_mass    = sphere_cells[i].get_particle(fp).get_mymass();
         	  my_pos     = sphere_cells[i].get_particle(fp).get_myposition();
-        	  //my_vel     = sphere_cells[i].get_particle(fp).get_myvelocity(); // optional with #ifdef or so
-
+        	  my_vel     = sphere_cells[i].get_particle(fp).get_myvelocity(); // optional with #ifdef or so
+              my_epot    = sphere_cells[i].get_particle(fp).get_myepot();
 
 
 
@@ -321,17 +325,18 @@ void construct_sphere(particle pobj, celltype cobj, char *fname){
         		   << setw(6) << setprecision(8) << my_mass
         		   << setw(6) << setprecision(8) << my_pos.x
         		   << setw(6) << setprecision(8) << my_pos.y
-        		   << setw(6) << setprecision(8) << my_pos.z << endl;
-                   // velocity to be included later
-
+        		   << setw(6) << setprecision(8) << my_pos.z
+        		   << setw(6) << setprecision(8) << my_vel.x
+        		   << setw(6) << setprecision(8) << my_vel.y
+        		   << setw(6) << setprecision(8) << my_vel.z
+        		   << setw(6) << setprecision(8) << my_epot
+        		   << endl;
 
           }
 
           fout.close(); // closing outfile connection
 
 	}// loop over sphere cells
-
-
 
 
 }
@@ -341,39 +346,31 @@ void make_mc_nblist(celltype cobj){
 	 // create neighbor list for the given cell
 
 	 ivec3d g_max = mc_global_cell_dim;    // global cell array dimension - Max
-
 	 ivec3d g_min = {0,0,0};               // global cell array dimension - Min
 
 	 ivec3d ref = cobj.get_cell_glob_coord();
-
-	 ivec3d ip_left,ip_right,ip_top,ip_bottom,ip_front,ip_back; // possible neighbors
+	 ivec3d ip_left,ip_right,ip_top,ip_bottom,ip_front,ip_back; // possible neighbors (NEED TO BE EXTENDED IF NECESSARY)
 
 
 	 // general nbl assignment
-
-	 ip_left.x  = --ref.x;  ip_left.y  = ref.y;   ip_left.z    = ref.z;
-	 ip_right.x = ++ref.x;  ip_right.y = ref.y;   ip_right.z   = ref.z;
-	 ip_front.x = ref.x;   ip_front.y  = ++ref.y; ip_front.z   = ref.z;
-	 ip_back.x  = ref.x;   ip_back.y   = --ref.y; ip_back.z    = ref.z;
-	 ip_top.x   = ref.x;   ip_top.y    = ref.y;   ip_top.z     = ++ref.z;
-	 ip_bottom.x = ref.x;  ip_bottom.y = ref.y;   ip_bottom.z  = --ref.z;
+	 ip_left.x  = --ref.x;       ip_left.y  = ref.y;      ip_left.z    = ref.z;
+	 ip_right.x = ++ref.x;       ip_right.y = ref.y;      ip_right.z   = ref.z;
+	 ip_front.x = ref.x;         ip_front.y = ++ref.y;    ip_front.z   = ref.z;
+	 ip_back.x  = ref.x;         ip_back.y  = --ref.y;    ip_back.z    = ref.z;
+	 ip_top.x   = ref.x;        ip_top.y    = ref.y;      ip_top.z     = ++ref.z;
+	 ip_bottom.x = ref.x;       ip_bottom.y = ref.y;      ip_bottom.z  = --ref.z;
 
 	 // cell on x boundary
-
-	 if(ref.x == g_min.x) {ip_left.x  = g_max.x;}  // extreme left  -xmax
-	 if(ref.x == g_max.x) ip_right.x  = g_min.x; // extreme right -xmin
+	 if(ref.x == g_min.x) ip_left.x  = g_max.x;         // extreme left    - xmax
+	 if(ref.x == g_max.x) ip_right.x  = g_min.x;        // extreme right   - xmin
 
 	 // cell on y boundary
-
-	 if(ref.y == g_min.y) ip_back.y   = g_max.y;  // extreme back   - ymax
-	 if(ref.y == g_max.y) ip_front.y  = g_min.y;  // extreme front  - ymin
-
+	 if(ref.y == g_min.y) ip_back.y   = g_max.y;        // extreme back    - ymax
+	 if(ref.y == g_max.y) ip_front.y  = g_min.y;        // extreme front   - ymin
 
 	 // cell on z boundary
-
-	 if(ref.z == g_min.z) ip_bottom.z = g_max.z; // extreme bottom -zmax
-	 if(ref.z == g_max.z) ip_top.z  = g_min.z;   // extreme top  - zmin
-
+	 if(ref.z == g_min.z) ip_bottom.z = g_max.z;        // extreme bottom  - zmax
+	 if(ref.z == g_max.z) ip_top.z  = g_min.z;          // extreme top     - zmin
 
      // assigning nbl coordinates to cell object
 
@@ -384,15 +381,13 @@ void make_mc_nblist(celltype cobj){
 	 cobj.set_my_bottom(ip_bottom);
 	 cobj.set_my_top(ip_top);
 
-
 }
 
 ivec3d get_cpu_gcoord(int myrank){
 
 	// compute cpu global coordinate based on process rank
 
-	ivec3d cpu_array[mc_ncpus];
-
+	ivec3d cpu_array[mc_ncpus];  // CHECK: have to be initialized via corresponding method
 	int count=0;
 
 	for(int i=0;i<stacks_block;i++ ){
@@ -407,7 +402,6 @@ ivec3d get_cpu_gcoord(int myrank){
 			}
 		}
 	}
-
 	return cpu_array[myrank];
 }
 
@@ -418,13 +412,10 @@ ivec3d get_cell_loc_coord(ivec3d glob_coord, ivec3d cpu_glob_pos){
 	ivec3d cell_loc_coord;
 
 	cell_loc_coord.x  = glob_coord.x - (cpu_glob_pos.x * mc_cpu_cell_dim.x);
-
 	cell_loc_coord.y  = glob_coord.y - (cpu_glob_pos.y * mc_cpu_cell_dim.y);
-
 	cell_loc_coord.z  = glob_coord.z - (cpu_glob_pos.z * mc_cpu_cell_dim.z);
 
 	return cell_loc_coord;
-
 }
 
 void make_particles(){
@@ -440,17 +431,17 @@ void make_particles(){
 
 	 cellblock loc_obj;
 
-
 	 //*************************************************
 
 //	 particle* atom;
 
 	 long m=0;
 	 for(long i=0;i<mc_tatoms_cpu;i++){
+
 		 particle atom;
 
+		 // IGNORE THIS PART IF NECESSARY
 //		 atom = new particle;
-//
 //		 atom->set_mynumber(mc_atomnumber.at(i));
 //		 atom->set_mytype(mc_atomtypes.at(i));
 //		 atom->set_mymass(mc_atommass.at(i));
@@ -468,7 +459,7 @@ void make_particles(){
 
 
  		 //**************************************************
- 		 // NOTE: generate velocity h
+ 		 // NOTE: generate velocity
  		 //**************************************************
  		 // by now should have constructed cell with boundary
 
@@ -504,7 +495,7 @@ void make_particles(){
 
 void create_maxwell_velocities(double mc_temp, ivec3d*  mc_restriction){
 
-	  // create and fill initial velocities for particles
+	  //   create and fill initial velocities for particles
 
       double vx,vy,vz;                      // velocity holders
       double imp_x,imp_y,imp_z;             // impulse holders
@@ -558,8 +549,6 @@ void create_maxwell_velocities(double mc_temp, ivec3d*  mc_restriction){
         	  sum_y += imp_y;
         	  sum_z += imp_z;
 
-
-
     	  } // loop particles -1
 
 //    	  sum_x = tot_dof_x == 0 ? 0.0 : sum_x / tot_dof_x;
@@ -612,31 +601,31 @@ void create_maxwell_velocities(double mc_temp, ivec3d*  mc_restriction){
 
 void make_cells(){
 
-
-	// method for creating cell objects and fill in cellblock container
-	// should assign cell boundary and ids correctly from the field
+    //    method for creating cell objects and fill in cellblock container
+	//    should assign cell boundary and ids correctly from the field
 
 	std::cout<<" make cells for process : "<< mc_pid << endl;
 	std::cout<<" total cell objects created : "<< calc_ncells_cpu() <<endl;
 
 	int cell_no     = 0;
 
+	// I: some method calls
 	stack_total   = calc_cpu_stack_total();
-	ncells_stack  = calc_ncells_stack();
+	ncells_stack  = calc_ncells_stack(); // NOTE: verify requirement
 	ncells_cpu    = calc_ncells_cpu();
 	int row_total = calc_cpu_row_total();
 	int col_total = calc_cpu_col_total();
-    vec3d min_bound = {0.0,0.0,0.0};
-    vec3d max_bound = {0.0,0.0,0.0};
 
-    ivec3d cell_gcoord = {0,0,0};
+//	vec3d min_bound = {0.0,0.0,0.0};
+//  vec3d max_bound = {0.0,0.0,0.0};
+
+    ivec3d cell_gcoord = {0,0,0}; // initialization
 
     int cells_stack=0;
 
     int x_fac = cpu_gcoord.x;
     int y_fac = cpu_gcoord.y;
     int z_fac = cpu_gcoord.z;
-
 
     //*****************************************************************
     // create cell objects and fill into cell block container eventually
@@ -647,11 +636,11 @@ void make_cells(){
 
     // loop over stack
 
-	for (auto stack_no=0; stack_no<stack_total; stack_no++){
+	for (int stack_no=0; stack_no<stack_total; stack_no++){
 
-		for(auto row_count=0; row_count<row_total; row_count++){
+		for(int row_count=0; row_count<row_total; row_count++){
 
-			for(auto col_count=0; col_count<col_total; col_count++){
+			for(int col_count=0; col_count<col_total; col_count++){
 
 				  celltype cell_obj;
 
@@ -674,32 +663,16 @@ void make_cells(){
 
 			}//column_count
 
-
-
 		}//row_count
-
 		//z dim to be updated here
-
 	}//stack loop
 
 } // make_cells
 
 void calc_mc_cpu_box(){
 
-	// computes cpu_box physical dimensions
-
-	//**********************************************
-	// NOTE: Scope verification
-	//**********************************************
-
-//	particle pnew;
-//	cellblock loc_obj;
-//	loc_obj.get_cell(0).add_particle(pnew);
-//
-//
-//    double val=	loc_obj.get_cell(0).get_particle(0).get_mymass();
-//
-//    loc_obj.cell_list.data();
+	//  computes cpu_box physical dimensions
+    // NOTE: CHECK IF REQUIRED Scope verification
 
 	// cpu box x vector
 	mc_cpu_box_x.x = mc_simbox_x.x / mc_cpu_dim.x;
@@ -720,17 +693,16 @@ void calc_mc_cpu_box(){
 
 void calc_mc_global_cell_array(){
 
-	// global cell array computation
+    //          MonteCarlo global cell array computation
 
 	mc_global_cell_dim.x = (int) std::floor((mc_simbox_x.x / mc_cell_dim.x));
 	mc_global_cell_dim.y = (int) std::floor((mc_simbox_y.y / mc_cell_dim.y));
 	mc_global_cell_dim.z = (int) std::floor((mc_simbox_z.z / mc_cell_dim.z));
-
 }
 
 void calc_mc_cpu_cell_array(){
 
-	// cpu cell array computation
+      //          MonteCarlo cpu cell array computation
 
 	mc_cpu_cell_dim.x = (int) std::floor(mc_cpu_box_x.x/ mc_cell_dim.x);
 	mc_cpu_cell_dim.y = (int) std::floor(mc_cpu_box_y.y/ mc_cell_dim.y);
@@ -739,20 +711,13 @@ void calc_mc_cpu_cell_array(){
 	if( mc_cpu_cell_dim.x != (mc_global_cell_dim.x/mc_cpu_dim.x)) std::cerr<<" Incompatible global and cell array dimension "<<endl;
 	if( mc_cpu_cell_dim.y != (mc_global_cell_dim.y/mc_cpu_dim.y)) std::cerr<<" Incompatible global and cell array dimension "<<endl;
 	if( mc_cpu_cell_dim.z != (mc_global_cell_dim.z/mc_cpu_dim.z)) std::cerr<<" Incompatible global and cell array dimension "<<endl;
-
 }
 
-
-// transformation box concept is mandatory to implement PBC effect correctly
-
-/******************************************************************************
-*
-*  compute box transformation matrix;
-*  NOTE: need to be extended or verified
-*
-******************************************************************************/
-
  void make_mc_tbox(){
+
+  // transformation box concept is mandatory to implement PBC effect correctly
+  //  compute box transformation matrix;
+  //  NOTE: need to be extended or verified
 
   /* first unnormalized */
 
@@ -773,18 +738,13 @@ void calc_mc_cpu_cell_array(){
   mc_height.x = 1.0 / scalar_prod(mc_tbox_x,mc_tbox_x);
   mc_height.y = 1.0 / scalar_prod(mc_tbox_y,mc_tbox_y);
   mc_height.z = 1.0 / scalar_prod(mc_tbox_z,mc_tbox_z);
-
 }
 
-/******************************************************************************
-*
-*  cell_coord computes the (global) cell coordinates of a position
-*  *  NOTE: need to be extended or verified
-*
-******************************************************************************/
+ivec3d cell_coordinate(double x, double y, double z){
 
-ivec3d cell_coordinate(double x, double y, double z)
-{
+  //  cell_coord computes the (global) cell coordinates of a position
+  //   NOTE: need to be extended or verified
+
   ivec3d coord;
 
   /* Map positions to boxes */
@@ -802,13 +762,11 @@ ivec3d cell_coordinate(double x, double y, double z)
   else if (coord.z < 0)                  coord.z = 0;
 
   return coord;
-
 }
-
 
 void calc_cpu_block_limits(){
 
-	// NOTE
+	// NOTE : COULD BE REMOVED
     //*********************************************************
     // seemingly not important
 	// compute CPU block limits in global dimension - called from rank 0
@@ -865,31 +823,31 @@ void calc_cpu_block_limits(){
 
 vec3d calc_cell_dim(double rcut,double rsample){
 
-	// get MC cell dimension
-	// now hard coded for test cases
-	   mc_cell_dim.x = (mc_simbox_x.x) / (rcut + rsample);
-	   mc_cell_dim.y = (mc_simbox_y.y) / (rcut + rsample);
-	   mc_cell_dim.z = (mc_simbox_z.z) / (rcut + rsample);
+	//    compute MonteCarlo cell dimension
 
-	   return mc_cell_dim;
+	mc_cell_dim.x = (mc_simbox_x.x) / (rcut + rsample);
+	mc_cell_dim.y = (mc_simbox_y.y) / (rcut + rsample);
+	mc_cell_dim.z = (mc_simbox_z.z) / (rcut + rsample);
+
+	return mc_cell_dim;
 }
 
-
-// get no of cells per cpu
-
 int calc_ncells_cpu(){
+
+	 //   compute no of cells in cpu
+
 	int ret = (int) std::floor((mc_cpu_box_x.x * mc_cpu_box_y.y * mc_cpu_box_z.z )/(mc_cell_dim.x * mc_cell_dim.y * mc_cell_dim.z));
     return ret;
 }
 
-// get no of cells per stack
-
 int calc_ncells_stack(){
+	// get no of cells per stack
 	// default stack pan (X * Y)
+	// CHECK IF NECESSARY
 	int ret = (int) std::floor((mc_cpu_box_x.x * mc_cpu_box_y.y)/(mc_cell_dim.x * mc_cell_dim.y));
 	return ret;
 }
-
+//: D NOTE try to merge row, column and stack into single method
 int calc_cpu_col_total(void){
     // compute no of cpu cell columns
 	int ret = (int) std::floor(mc_cpu_box_x.x/ mc_cell_dim.x);
@@ -910,21 +868,13 @@ int calc_cpu_stack_total(){
 	return ret;
 }
 
-// some cell list methods
-
 void calc_block_dim(){
 
-	// method for computing block dimensions
+	//  method for computing domain block dimensions
 
-	// to be improved
-
-	cols_block = mc_global_cell_dim.x / mc_cpu_cell_dim.x;
-
-	rows_block  = mc_global_cell_dim.y / mc_cpu_cell_dim.y;
-
+	cols_block   = mc_global_cell_dim.x / mc_cpu_cell_dim.x;
+	rows_block   = mc_global_cell_dim.y / mc_cpu_cell_dim.y;
 	stacks_block = mc_global_cell_dim.z / mc_cpu_cell_dim.z;
-
-
 }
 
 int get_cpu_rank(ivec3d cell_coord){
@@ -939,29 +889,21 @@ int get_cpu_rank(ivec3d cell_coord){
 	red_vec.z = cell_coord.z / mc_cpu_cell_dim.z;
 
 	proc_rank = (cols_block * rows_block * red_vec.z ) + (cols_block * red_vec.y) + (red_vec.x);
-
 	return proc_rank;
-
 }
 
 // essential methods
 
 double get_gaussian(double sigma){
 
-	      /*********************************************************************************
-	      *     this code fragment/logic is inspired and inherited from IMD- imd_maxwell.c
-	      *
-	      *     * Polar (Box-Mueller) method; See Knuth v2, 3rd ed, p122
-	      *********************************************************************************/
+	      //     this code fragment/logic is inspired and inherited from IMD- imd_maxwell.c
+	      //     Polar (Box-Mueller) method; See Knuth v2, 3rd ed, p122
 
 		  double x, y, r2;
 
 		  do{
 		      /* choose x,y in uniform square (-1,-1) to (+1,+1) */
-
-
 			  // NOTE: c++ random generator to be updated check later
-
 
 		      x = -1 + 2 * drand48();
 		      y = -1 + 2 * drand48();
@@ -972,28 +914,33 @@ double get_gaussian(double sigma){
 		  }while (r2 > 1.0 || r2 == 0);
 
 
-		  /* Box-Muller transform */
+		  /* Box- Muller transform */
 		  return (double) (sigma * y * sqrt (-2.0 * log (r2) / r2));
-
 
 }
 
 // some utility methods
 
 double scalar_prod(vec3d u, vec3d v){
-	   /* double vector - scalar product */
+
+	    // double vector - scalar product
+
 	   double val = (u.x * v.x ) + (u.y * v.y) + (u.z * v.z);
        return val;
 }
 
 int iscalar_prod(ivec3d u, ivec3d v){
-	   /* integer vector - scalar product */
+
+	   // integer vector - scalar product
+
        int val = (u.x * v.x ) + (u.y * v.y) + (u.z * v.z);
        return val;
 }
 
 vec3d vector_prod(vec3d u, vec3d v) {
-	   /* double vector - vector product */
+
+	   //  float vector product
+
         vec3d w;
         w.x = u.y * v.z - u.z * v.y;
         w.y = u.z * v.x - u.x * v.z;
@@ -1002,7 +949,9 @@ vec3d vector_prod(vec3d u, vec3d v) {
 }
 
 ivec3d ivector_prod(ivec3d u, ivec3d v) {
-	   /* integer vector - vector product */
+
+	  //  integer vector - vector product
+
 	   vec3d w;
        w.x = u.y * v.z - u.z * v.y;
        w.y = u.z * v.x - u.x * v.z;
@@ -1012,7 +961,7 @@ ivec3d ivector_prod(ivec3d u, ivec3d v) {
 
 double distance_vect(vec3d v1,vec3d v2){
 
-	// distance between two position vectors
+   //  distance between two vectors
 
 	double dist;
 	vec3d temp_v;
@@ -1024,7 +973,6 @@ double distance_vect(vec3d v1,vec3d v2){
 	dist = sqrt(scalar_prod(temp_v,temp_v));
 
 	return dist;
-
 }
 
 // end of utility methods

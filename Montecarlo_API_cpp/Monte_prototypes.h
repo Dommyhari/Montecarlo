@@ -8,28 +8,38 @@
 #ifndef MONTE_PROTOTYPES_H_
 #define MONTE_PROTOTYPES_H_
 
+#include <string>
 #include "Monte_globals.h"
 #include "Monte_classes.h"
+
 
 // utility methods definition
 
 void update_particle(int  cell_id, particle ref_atom );
 
-void read_update_config (char* fname);
+void do_local_mdrun(string bin_name,string param_name);
+
+particle sample_zone(celltype cobj);
+
+void read_update_config (char* fname, particle pobj);
 
 void construct_sphere (particle pobj, celltype cobj, char *fname); // calling method - sampler would have signatures
 
 void make_mc_nblist(celltype cobj);
 
-void create_maxwell_velocities(double mc_temp, ivec3d*  mc_restriction);
+void create_maxwell_velocities(cellblock loc_obj,double mc_temp, ivec3d*  mc_restriction);
 
 ivec3d get_cpu_gcoord(int myrank);
 
 ivec3d get_cell_loc_coord(ivec3d glob_coord, ivec3d cpu_glob_pos);
 
-void make_particles(void);
+void make_particles(cellblock loc_obj);
 
-void make_cells(void);
+void fill_mc_container(cellblock loc_obj);
+
+void make_cells(cellblock loc_obj);
+
+void count_particles(cellblock loc_obj);
 
 void  calc_mc_cpu_box(void);
 
@@ -43,7 +53,7 @@ ivec3d cell_coordinate(double x, double y, double z);
 
 void calc_cpu_block_limits();
 
-vec3d calc_cell_dim(double rcut,double rsample);
+vec3d calc_cell_dim(double rsample);
 
 int calc_ncells_cpu(void);
 

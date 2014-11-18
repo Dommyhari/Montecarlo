@@ -10,9 +10,18 @@
 #ifndef MONTE_GLOBALS_H_
 #define MONTE_GLOBALS_H_
 
+
+#include<iomanip>
+#include<fstream>
+#include<string>
+#include<iostream>
+#include<ctime>
+#include<cmath>
+#include<cstdlib>
 #include<random>
 #include<vector>
-#include<mpi.h>
+#include "Monte_classes.h"
+#include "mpi.h"
 
 using namespace std;
 
@@ -26,28 +35,14 @@ vector<double> mc_velocities;    //  vector container for atom velocities
 vector<double> mc_epot;          //  vector container for atom potential energy
 
 
-// some user type definitions
-
-/* 3d Vector real */
-typedef struct {double x; double y; double z; } vector3d;
-
-typedef vector3d vec3d;
-
-/* 3d Vector integer */
-typedef struct {int x; int y; int z; } ivector3d;
-
-typedef ivector3d ivec3d;
-
-
 // some flags
 int mc_parallel_flag;       // to be initialized during init_mc method call
-
 int mc_get_velocity = 0;    // 0: default, 1: MD need velocity data
 
+
+// should be passed as a parameter file // param file reader to be developed
 char* file_name = "mc_sphere.chkpt";
-
 string md_binary = "imd_eam_glok_homdef_nbl_virtual_atoms";
-
 string md_param = "local_md.param";
 
 int accept_flag= 0;
@@ -55,6 +50,11 @@ int accept_flag= 0;
 //**********************************************************************************
 //                           Initialization from MD part
 //**********************************************************************************
+
+// MPI handles
+MPI_Comm comm_name; // MPI Cartesian communicator
+MPI_Status status;
+
 
 ivec3d mc_cpu_dim;                              // get and assign cpu dim array                           MD-init
 int mc_ncpus;                                   // no of cpus get & assign from                           MD-init
@@ -65,7 +65,7 @@ ivec3d  mc_restriction[mc_tot_types];           // get restriction vectors from 
 
 // to be initialized in Monte_init methods
 long   mc_tatoms_cpu;                           //  total particles per cpu
-int    mc_prank;                                //  process id
+int    mc_prank;                                //  process rank
 
 double mc_temp;                                 //  get simulation temperature (T=0: static and T>0: dynamic)
 double mc_rsweep ;                              //  r_cut + r_sample
@@ -74,7 +74,7 @@ int    mc_sample_seed;                          //  seed for zone sampler
 
 
 // Montecarlo variables
-int    mc_nbcells = 26 ;                        // 26  NB cells count
+int    mc_nbcells = 27 ;                        // 27  NB cells count
 long   mc_real_cpu;                             // total real particles in this system
 long   mc_phold_cpu;                            // total placeholders in cpu
 long   mc_carb_cpu;                             // total carbons in cpu
@@ -106,6 +106,19 @@ vec3d mc_cell_dim;                                                    // cell di
 //:make_mc_tbox() -- implicit definition
 double mc_volume;                                                    // some internal attributes for mapping
 vec3d mc_height;                                                      // used for global cell coordinates
+
+
+// windows sampler
+
+// all possible window neighbors
+
+int windows_count = 8;
+
+// possible neighbor index as per window location
+
+int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
+int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
+int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
 
 
 

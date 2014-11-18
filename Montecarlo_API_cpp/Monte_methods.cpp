@@ -4,19 +4,50 @@
  *              contain all utility methods for Montecarlo
  *******************************************************************************/
 
-#include<iostream>
-#include<iomanip>
-#include<fstream>
-#include<vector>
-#include<string>
-#include<cstdlib>
-#include<cmath>
 #include "Monte_classes.h"
 #include "Monte_globals.h"
 #include "Monte_prototypes.h"
 
 using namespace std;
 
+int get_cpu_neighbor(int inde0,int inde1,int inde2){
+	int nb_grid_coord[3],nb_rank;
+    nb_grid_coord[0] = inde0;
+    nb_grid_coord[1] = inde1;
+    nb_grid_coord[2] = inde2;
+
+    // get process rank from grid coord
+    MPI_Cart_rank(comm_name,nb_grid_coord,&nb_rank);
+    return nb_rank;
+
+}
+
+void setup_config(){
+
+    // compute Montecarlo cell dimension
+	calc_cell_dim(mc_rsweep);
+
+    // compute cpu box physical dimensions
+	calc_mc_cpu_box();
+
+	// construct transformation box
+	make_mc_tbox();
+
+	// compute global cell array
+	calc_mc_global_cell_array();
+
+	// compute cpu cell array
+	calc_mc_cpu_cell_array();
+
+	// all cpu global position
+
+	// change it accordingly to compute from Vitrual topology
+	get_cpu_gcoord(mc_prank);
+
+	// compute domain block dimension
+	calc_block_dim();
+
+}
 
 void update_particle( int  cell_id, particle ref_atom ){
 
@@ -99,33 +130,82 @@ void do_local_mdrun(string bin_name,string param_name){
 
 }
 
-particle sample_zone(celltype cobj,int sample_seed){
+// sample_seed parameter have to be used at callee function/method
+particle sample_zone(cellblock bobj,int win_id){
 
-	long rand_no;
+	// NEED CHANGES
+
+	celltype cobj;
+	celltype sample_cells[8];
+
+	// local cell coordinates zone
+    ivec3d test;
+    int count=0,rand_cell;
+
+    ivec6d zone_limit[8];
+
+    // NOTE: HARDCODED FOR 8 CELLS IN A WINDOW
+    zone_limit[0] = {0,1,0,1,0,1};
+    zone_limit[1] = {0,1,0,1,1,2};
+    zone_limit[2] = {1,2,0,1,0,1};
+    zone_limit[3] = {1,2,0,1,1,2};
+    zone_limit[4] = {0,1,1,2,0,1};
+    zone_limit[5] = {0,1,1,2,1,2};
+    zone_limit[6] = {1,2,1,2,0,1};
+    zone_limit[7] = {1,2,1,2,1,2};
+
+
+    // prepare cell list as per sample window id
+
+    for(int i=zone_limit[win_id].xmin;i<=zone_limit[win_id].xmax;i++){
+    	for(int j=zone_limit[win_id].ymin;j<=zone_limit[win_id].ymax;j++){
+    		for(int k=zone_limit[win_id].zmin;k<=zone_limit[win_id].zmax;k++){
+
+    			test.x = i; test.y = j; test.z = k;
+    			sample_cells[count] = bobj.cell_with_lcoord(test);
+
+                count++;
+    		}
+    	}
+    }
+
+	long rand_no,n_particles;
 	particle atom;
 
-
 	//srand(time(NULL));
-	srand(sample_seed);
+	//srand(sample_seed);
+
+	// NOTE: HARDCODED FOR 8 CELLS IN A WINDOW
+	rand_cell = rand()%8;
+
+	cobj = sample_cells[rand_cell];
 
 	do{
-		rand_no=(long) rand()%mc_tatoms_cpu;
+		//no of particles
+		n_particles= cobj.get_nparticles();
+		// choosing random placeholder
+		rand_no=(long) rand()%n_particles;
 	}while(cobj.get_particle(rand_no).get_mytype() !=2);
 
 	atom = cobj.get_particle(rand_no);
+
+
 
 	// make change only in particle object
 	// swapping placeholder into carbon
 	// HC: hardcoded to 1
     atom.set_mytype(1);
 
+
     // construct sphere around selected particle
-    construct_sphere(atom,cobj,file_name);
+    construct_sphere(atom,bobj,win_id,file_name);
 
 	return atom;
 }
 
 void read_update_config (char* fname,particle pobj){
+
+	// NEED CHANGES
 
 	// method for reading current file configuration and updating particle attributes
 	// with in and across cpu process
@@ -268,517 +348,577 @@ void read_update_config (char* fname,particle pobj){
 
 }
 
-void construct_sphere(particle pobj, celltype cobj, char *fname){
+void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
-	// Construct sphere around chosen particle and write the particles with in (r_sweep = r_cut + r_sample) to configuration file
-	//NOTE: now hard coded for mc_nbcells=6 neighbors
 
-	ivec3d mycell_glob;                      // chosen cell global coordinate
-	ivec3d temp_glob, temp_loc, temp_block ; // temporary holder for  coordinates
+	    // select neighbors as per sample window position
+		int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
 
-	mycell_glob = cobj.get_cell_glob_coord();
+		// send neighbors ----- odd -even process communications (in z direction)
+		int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
 
-	vec3d temp_pos, temp_vel, vec1, vec2;
-	long temp_id; int temp_type;            // temporary holder for particle attributes
-	double temp_mass, temp_epot, dist_check;
+		// Receive neighbors ----- odd -even process communications (in z direction)
+		int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
 
-	int xflag[6]={0,0,0,0,0,0};
-	int yflag[6]={0,0,0,0,0,0};
-	int zflag[6]={0,0,0,0,0,0};     // some utility flags for boundary checks
+	    // send neighbors ----- odd-odd / even-even process communications (in x/y direction)
+		int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
 
-	ivec3d g_max = mc_global_cell_dim;    // global cell array dimension - Max
-	ivec3d g_min = {0,0,0};               // global cell array dimension - Min
+		// Receive neighbors ----- odd-odd / even-even process communications (in x/y direction)
+		int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
 
 
-	char * filename = fname;                // file name as per simulation state from signature
+		// my cpu coordinate
+		cpu_gcoord = get_cpu_gcoord(mc_prank); int x = cpu_gcoord.x; int y = cpu_gcoord.y; int z = cpu_gcoord.z;
 
-	// object definitions
+		double my_pos[3], rec_pos_0[3],rec_pos_1[3],rec_pos_2[3],rec_pos_3[3],rec_pos_4[3],rec_pos_5[3],rec_pos_6[3],rec_pos_7[3];
 
-	particle temp_part;
-	celltype sphere_cells[mc_nbcells + 1]; // list of neighbor cells + own cell
-	cellblock loc_obj;
+		double* rec_pos[8]={rec_pos_0,rec_pos_1,rec_pos_2,rec_pos_3,rec_pos_4,rec_pos_5,rec_pos_6,rec_pos_7};
 
-	// manipulator settings
-	cout << fixed << right;
+		my_pos[0]=pobj.get_myposition().x; my_pos[1]=pobj.get_myposition().y; my_pos[2]=pobj.get_myposition().z;
 
-	// initialize reference particle
-	vec1 = pobj.get_myposition();
 
-	// get reference particle sweep boundary
-	double ref_xmin = vec1.x - (mc_rsweep + mc_sphere_wall);
-	double ref_ymin = vec1.y - (mc_rsweep + mc_sphere_wall);   // minimum boundary
-	double ref_zmin = vec1.z - (mc_rsweep + mc_sphere_wall);
+		// communication part -- request neighbors with chosen particle
 
-//	double ref_xmax = vec1.x + (mc_rsweep + mc_sphere_wall);
-//	double ref_ymax = vec1.y + (mc_rsweep + mc_sphere_wall);   // maximum boundary
-//	double ref_zmax = vec1.z + (mc_rsweep + mc_sphere_wall);
+		// z direction communication
+		for (int ind=0;ind<4;ind++){
 
+		     if (z%2==0){
 
-    // global boundary check and flag initialization
+		       // front comm
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),0,comm_name);
+		       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),1,comm_name,&status);
 
-	// global_xmin
-    if( temp_glob.x == g_min.x) xflag[0] =  -1;
-    // global_xmax
-    if( temp_glob.x == g_max.x) xflag[1] =   1;
-    // global_ymin
-    if( temp_glob.y == g_min.y) yflag[2] =  -1;
-    // global_ymax
-    if( temp_glob.y == g_max.y) yflag[3] =   1;
-    // global_zmin
-    if( temp_glob.z == g_min.z) zflag[4] =  -1;
-    // global_zmax
-    if( temp_glob.z == g_max.z) zflag[5] =   1;
+		     }
+		     else{
 
+		       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),0,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),1,comm_name);
 
-    //********** loop over Neighbor cells list **************
+		     }
+		}
 
-    // Later neighbor cells could be constructed with SMART nbl list and looped over the same
-	for(int i=0; i<=mc_nbcells ; i++){
+		// Next phase even-even or odd-odd communications
 
-          // getting nbl cells, cpu and cell address
+		// x direction communication
+		if (x%2 == 0){
+		         // right & left comm
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),2,comm_name);
+		       MPI_Recv(rec_pos[4],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),3,comm_name,&status);
 
-	      // get neighbor cell global coordinate
-		  if(i!=mc_nbcells){
-	      temp_glob = cobj.get_nbl_id(i); }
+		         // top-right & bottom-left comm
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),4,comm_name);
+		       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),5,comm_name,&status);
+		}
+		else{
+			   // right & left comm
+		       MPI_Recv(rec_pos[4],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),2,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),3,comm_name);
 
-	      // include chosen particle own cell
-	      if(i==mc_nbcells){ temp_glob = mycell_glob; }
+		       // top-right & bottom-left comm
+		       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),4,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),5,comm_name);
 
-	      // get cpu rank
-	      int loc_rank = get_cpu_rank(temp_glob);
+		}
 
-	      // get cpu block coordinate
-	      temp_block = get_cpu_gcoord(loc_rank);
+		// y direction communication
 
-	      //  Foreign cpu cell
-	      if(mc_prank != loc_rank) {
+		if (y%2 == 0){
+		         // top & bottom comm
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),4,comm_name);
+		       MPI_Recv(rec_pos[6],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),5,comm_name,&status);
+		}
+		else{
 
-	    	   // preliminary notifier
-		       cout<<"Note from sphere construction pid: "<<mc_prank <<"\n"<<" Require process communication with : "<< loc_rank <<endl;
+		       MPI_Recv(rec_pos[6],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),4,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),5,comm_name);
+		}
 
-		       // unpack datas from MPI packed buffers
-               //****  NOTE MPI receive calls here
-		       // into  buffer
-		       // after receiving and unpacking
 
-		       long p_total; // should get from MPI receive
-		       long p_c,v_c; // value holders
+		// do sweep test to construct buffers
 
-		       // loop over n_particles received
 
-		       for( long k=0; k<p_total; k++ ){
+	    //******************************************************************
+	    // NOTE: HARDCODED FOR 8 CELLS IN A WINDOW (OWN CPU)
+        // NEED TO BE GENERALIZED LATER DURING BIAS APPROACH
 
-		    	  //  p_c =  k+(size*3);
-		    	  //  v_c =  k+(size*3*3);
-		    	  //  temp_type   = buffer[k];
-		    	  //  temp_id     = buffer[k+size];
-		    	  //  temp_mass   = buffer[k+(size*2)];
-		    	  //  temp_epot   = buffer[k+(size*3)]; // NOTE: need to be verified
-		    	  //  temp_pos.x  = buffer[p_c++] + (xflag[i] * mc_simbox_x.x);
-		    	  //  temp_pos.y  = buffer[p_c++] + (yflag[i] * mc_simbox_y.y);
-		    	  //  temp_pos.z  = buffer[p_c++] + (zflag[i] * mc_simbox_z.z);
-		    	  //  temp_vel.x  = buffer[v_c++];
-		    	  //  temp_vel.y  = buffer[v_c++];
-		    	  //  temp_vel.z  = buffer[v_c++];
+		// local cell coordinates zone
+	    ivec3d test, nb_test[19]; ivec6d zone_limit[8];ivec6d zone_neigh[8];
 
+	    // window sampling cells
+	    celltype sample_cells[8];
 
-		          vec2 = {temp_pos.x,temp_pos.y,temp_pos.z}; // particle two position assignment
-		          dist_check = distance_vect(vec1,vec2);
+	    //window neighbor cells
+        celltype neighb_1[4],neighb_2[2],neighb_4[1],neighb_6[2],neighb_3[4],neighb_5[2],neighb_7[4];
 
-		          //**************************************************************
-		          //NOTE: to be updated in callee process to make dist_check
-		          //**************************************************************
+        int nb_xmin,nb_ymin,nb_zmin,nb_xmax,nb_ymax,nb_zmax,nb_x,nb_y,nb_z;
 
-		          // ----- cutoff check
+	    zone_limit[0] = {0,1,0,1,0,1}; // window 0
+	    zone_limit[1] = {0,1,0,1,1,2}; // window 1
+	    zone_limit[2] = {1,2,0,1,0,1}; // window 2
+	    zone_limit[3] = {1,2,0,1,1,2}; // window 3
+	    zone_limit[4] = {0,1,1,2,0,1}; // window 4
+	    zone_limit[5] = {0,1,1,2,1,2}; // window 5
+	    zone_limit[6] = {1,2,1,2,0,1}; // window 6
+	    zone_limit[7] = {1,2,1,2,1,2}; // window 7
 
-		          if(dist_check <= mc_rsweep + mc_sphere_wall){
 
-		        	  // declare virtual particles on sphere boundary
-		        	  if( dist_check > mc_rsweep){
+	    // assign neighbor cell ranges
+	    nb_xmin = zone_limit[win_id].xmin; nb_xmax = zone_limit[win_id].xmax;
+	    nb_ymin = zone_limit[win_id].ymin; nb_ymax = zone_limit[win_id].ymax;
+	    nb_zmin = zone_limit[win_id].zmin; nb_zmax = zone_limit[win_id].zmax;
 
-                          // ignore placeholders on sphere wall
-		        		  if (temp_type != 2 ){ // HC: now hardcoded for placeholders
+	    if(nb_xmax ==1) {nb_x = 2;}
+	    else{ nb_x=0; }
 
-				        	  temp_part.set_mytype(temp_type + mc_real_types);  // HC: hardcoded for ntypes=3
-				        	  temp_part.set_mynumber(temp_id);
-				        	  temp_part.set_mymass(temp_mass);
+	    if(nb_ymax ==1) {nb_y = 2;}
+	    else{ nb_y=0; }
 
-				        	  // shift filtered particle coordinates to reference sphere
-				        	  temp_part.set_myposition((temp_pos.x - ref_xmin),(temp_pos.y - ref_ymin),(temp_pos.z - ref_zmin));
+	    if(nb_zmax ==1) {nb_z = 2;}
+	    else{ nb_z=0; }
 
-				        	  temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
-				        	  temp_part.set_myepot(temp_epot);
+        // prepare NEIGHBOR cell list as per sample window id
+	    //Neighbor-1 (N1)
+	    nb_test[0].x =nb_xmin; nb_test[0].y = nb_ymin; nb_test[0].z = nb_z; neighb_1[0]=bobj.cell_with_lcoord(nb_test[0]);
+	    nb_test[1].x =nb_xmax; nb_test[1].y = nb_ymin; nb_test[1].z = nb_z; neighb_1[1]=bobj.cell_with_lcoord(nb_test[1]);
+	    nb_test[2].x =nb_xmin; nb_test[2].y = nb_ymax; nb_test[2].z = nb_z; neighb_1[2]=bobj.cell_with_lcoord(nb_test[2]);
+	    nb_test[3].x =nb_xmax; nb_test[3].y = nb_ymax; nb_test[3].z = nb_z; neighb_1[3]=bobj.cell_with_lcoord(nb_test[3]);
 
-				        	  sphere_cells[i].add_particle(temp_part);
+        //Neighbor-2 (N2)
+        nb_test[4].x = nb_x; nb_test[4].y = nb_ymin; nb_test[4].z = nb_z; neighb_2[0] = bobj.cell_with_lcoord(nb_test[4]);
+        nb_test[5].x = nb_x; nb_test[5].y = nb_ymax; nb_test[5].z = nb_z; neighb_2[1] = bobj.cell_with_lcoord(nb_test[5]);
 
-		        		  }
-		        	  }
-		        	  else{ // include all particles inside mc_rsweep
+        //Neighbor-3 (N4)
+        nb_test[6].x = nb_x; nb_test[6].y = nb_y; nb_test[6].z = nb_z; neighb_4[0] = bobj.cell_with_lcoord(nb_test[6]);
 
-			        	  temp_part.set_mytype(temp_type);
-			        	  temp_part.set_mynumber(temp_id);
-			        	  temp_part.set_mymass(temp_mass);
+        //Neighbor-4 (N6)
+        nb_test[7].x = nb_xmin; nb_test[7].y = nb_y; nb_test[7].z = nb_z; neighb_6[0] = bobj.cell_with_lcoord(nb_test[7]);
+        nb_test[8].x = nb_xmax; nb_test[8].y = nb_y; nb_test[8].z = nb_z; neighb_6[1] = bobj.cell_with_lcoord(nb_test[8]);
 
-			        	  // shift filtered particle coordinates to reference sphere
-			        	  temp_part.set_myposition((temp_pos.x - ref_xmin),(temp_pos.y - ref_ymin),(temp_pos.z - ref_zmin));
+        //Neighbor-5 (N3)
+	    nb_test[9].x =nb_x;   nb_test[9].y = nb_ymin; nb_test[9].z = nb_zmin;  neighb_3[0]=bobj.cell_with_lcoord(nb_test[9]);
+	    nb_test[10].x =nb_x; nb_test[10].y = nb_ymin; nb_test[10].z = nb_zmax; neighb_3[1]=bobj.cell_with_lcoord(nb_test[10]);
+	    nb_test[11].x =nb_x; nb_test[11].y = nb_ymax; nb_test[11].z = nb_zmin; neighb_3[2]=bobj.cell_with_lcoord(nb_test[11]);
+	    nb_test[12].x =nb_x; nb_test[12].y = nb_ymax; nb_test[12].z = nb_zmax; neighb_3[3]=bobj.cell_with_lcoord(nb_test[12]);
 
-			        	  temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
-			        	  temp_part.set_myepot(temp_epot);
+        //Neighbor-6 (N5)
+        nb_test[13].x = nb_x; nb_test[13].y = nb_y; nb_test[13].z = nb_zmin; neighb_5[0] = bobj.cell_with_lcoord(nb_test[13]);
+        nb_test[14].x = nb_x; nb_test[14].y = nb_y; nb_test[14].z = nb_zmax; neighb_5[1] = bobj.cell_with_lcoord(nb_test[14]);
 
-			        	  sphere_cells[i].add_particle(temp_part);
+	    //Neighbor-7 (N7)
+	    nb_test[15].x =nb_xmin; nb_test[15].y = nb_y; nb_test[15].z = nb_zmin; neighb_7[0]=bobj.cell_with_lcoord(nb_test[15]);
+	    nb_test[16].x =nb_xmin; nb_test[16].y = nb_y; nb_test[16].z = nb_zmax; neighb_7[1]=bobj.cell_with_lcoord(nb_test[16]);
+	    nb_test[17].x =nb_xmax; nb_test[17].y = nb_y; nb_test[17].z = nb_zmin; neighb_7[2]=bobj.cell_with_lcoord(nb_test[17]);
+	    nb_test[18].x =nb_xmax; nb_test[18].y = nb_y; nb_test[18].z = nb_zmax; neighb_7[3]=bobj.cell_with_lcoord(nb_test[18]);
 
-		        	  }
 
-		          } // cut-off check
+	    int count=0;
 
-		       } // end of particles loop
+	    // prepare SAMPLE cell list as per sample window id
 
-	      }//end of cpu foreign cells
+	    for(int i=zone_limit[win_id].xmin;i<=zone_limit[win_id].xmax;i++){
+	    	for(int j=zone_limit[win_id].ymin;j<=zone_limit[win_id].ymax;j++){
+	    		for(int k=zone_limit[win_id].zmin;k<=zone_limit[win_id].zmax;k++){
 
+	    			test.x = i; test.y = j; test.z = k;
+	    			sample_cells[count] = bobj.cell_with_lcoord(test);
 
-	      // cpu native cells
-	      else{
+	                count++;
+	    		}// k loop
+	    	}// j loop
+	    }// i loop
 
-		       // get cell local coordinate
-		       ivec3d cell_loc_coord = get_cell_loc_coord(temp_glob,temp_block);
 
-		       // to get memory index of cell in cell list
-		       int cell_index = cell_loc_coord.x + (cell_loc_coord.y * mc_cpu_cell_dim.x) + (cell_loc_coord.z * mc_cpu_cell_dim.x * mc_cpu_cell_dim.x);
 
-		       // get particles count
-		       long p_total = loc_obj.get_cell(cell_index).get_nparticles();
-
-		       for( long pcount; pcount<p_total; pcount++ ){
-
-		    	   // reading values
-		    	   temp_id    = loc_obj.get_cell(cell_index).get_particle(pcount).get_mynumber();
-		    	   temp_type  = loc_obj.get_cell(cell_index).get_particle(pcount).get_mytype();
-		    	   temp_mass  = loc_obj.get_cell(cell_index).get_particle(pcount).get_mymass();
-		    	   temp_pos   = loc_obj.get_cell(cell_index).get_particle(pcount).get_myposition();
-		    	   temp_vel   = loc_obj.get_cell(cell_index).get_particle(pcount).get_myvelocity();
-		    	   temp_epot  = loc_obj.get_cell(cell_index).get_particle(pcount).get_myepot();
-
-		    	   // particle 2 position assignment
-			       vec2 = temp_pos;
-
-			       dist_check = distance_vect(vec1,vec2);
-
-			          // ----- cutoff check
-
-			          if(dist_check <= mc_rsweep + mc_sphere_wall){
-
-			        	  // declare virtual particles on sphere boundary
-			        	  if( dist_check > mc_rsweep){
-
-	                          // ignore placeholders on sphere wall
-			        		  if (temp_type != 2 ){ // HC: now hardcoded for placeholders
-                                  // introduce virtual particles
-					        	  temp_part.set_mytype(temp_type + 3);  // HC: hardcoded for ntypes=3
-					        	  temp_part.set_mynumber(temp_id);
-					        	  temp_part.set_mymass(temp_mass);
-
-					        	  // shift filtered particle coordinates to reference sphere
-					        	  temp_part.set_myposition((temp_pos.x - ref_xmin),(temp_pos.y - ref_ymin),(temp_pos.z - ref_zmin));
-
-					        	  temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
-					        	  temp_part.set_myepot(temp_epot);
-
-					        	  sphere_cells[i].add_particle(temp_part);
-
-			        		  }
-			        	  }
-			        	  else{ // include all particles inside mc_rsweep
-
-				        	  temp_part.set_mytype(temp_type);
-				        	  temp_part.set_mynumber(temp_id);
-				        	  temp_part.set_mymass(temp_mass);
-
-				        	  // shift filtered particle coordinates to reference sphere
-				        	  temp_part.set_myposition((temp_pos.x - ref_xmin),(temp_pos.y - ref_ymin),(temp_pos.z - ref_zmin));
-
-				        	  temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
-				        	  temp_part.set_myepot(temp_epot);
-
-				        	  sphere_cells[i].add_particle(temp_part);
-
-			        	  }
-
-			          } // cut-off check
-
-		       } // end of particles loop
-
-          }// end of native cell
-
-	}// end of sphere cell list - 1
-
-	// shift chosen particle coordinate to ref.sphere
-	particle temp_pobj = pobj;
-	vec3d temp_pos = temp_pobj.get_myposition();
-	temp_pobj.set_myposition(temp_pos.x-ref_xmin,temp_pos.y-ref_ymin,temp_pos.z-ref_zmin);
-
-	// add the randomly selected reference particle
-	sphere_cells[mc_nbcells].add_particle(temp_pobj);
-
-	// file writing methods
-
-
-	long my_number;
-	int my_type;
-    double my_mass, my_epot;
-    vec3d my_pos, my_vel;
-
-    // opening file stream object
-    ofstream fout(filename, ios_base::out);
-
-    cout<<" Sphere constructor writing to file : " << filename<<endl;
-
-    //********** loop over revised sphere cell list - 2 **************
-
-	for(int i=0; i<=mc_nbcells; i++){
-
-		  long fp_total = sphere_cells[i].get_nparticles();
-
-          for(long fp; fp<fp_total; fp++){
-
-        	  my_number  = sphere_cells[i].get_particle(fp).get_mynumber();
-        	  my_type    = sphere_cells[i].get_particle(fp).get_mytype();
-        	  my_mass    = sphere_cells[i].get_particle(fp).get_mymass();
-        	  my_pos     = sphere_cells[i].get_particle(fp).get_myposition();
-        	  my_vel     = sphere_cells[i].get_particle(fp).get_myvelocity(); // optional with #ifdef or so
-              my_epot    = sphere_cells[i].get_particle(fp).get_myepot();
-
-
-
-        	  // file flush
-        	  fout << setw(8) << my_number
-        		   << setw(6) << my_type
-        		   << setw(6) << setprecision(8) << my_mass
-        		   << setw(6) << setprecision(8) << my_pos.x
-        		   << setw(6) << setprecision(8) << my_pos.y
-        		   << setw(6) << setprecision(8) << my_pos.z
-        		   << setw(6) << setprecision(8) << my_vel.x
-        		   << setw(6) << setprecision(8) << my_vel.y
-        		   << setw(6) << setprecision(8) << my_vel.z
-        		   << setw(6) << setprecision(8) << my_epot
-        		   << endl;
-
-          }
-
-	}// loop over sphere cell list - 2
-
-	fout.close(); // closing outfile connection
 
 }
+
+//void construct_sphere(particle pobj, celltype cobj, int win_id,char* filename){
+//
+//	// NEED CHANGES
+//
+//	// select neighbors as per sample window
+//	int xfact = window_x[win_id];
+//	int yfact = window_y[win_id];
+//	int zfact = window_z[win_id];
+//
+//	// send neighbors ----- odd -even process communications (in z direction)
+//	int x_send_phase[4] = { 0,xfact,xfact, 0};
+//	int y_send_phase[4] = { 0, 0,yfact,yfact};
+//	int z_send_phase[4] = {zfact,zfact,zfact,zfact};
+//
+//	// Receive neighbors ----- odd -even process communications (in z direction)
+//	int x_recv_phase[4] = { 0,xfact,xfact, 0};
+//	int y_recv_phase[4] = { 0, 0,yfact,yfact};
+//	int z_recv_phase[4] = {zfact,zfact,zfact,zfact};
+//
+//    // send neighbors ----- odd-odd / even-even process communications (in x/y direction)
+//	int x_send_next[3] = {xfact,xfact, 0 };
+//	int y_send_next[3] = { 0,yfact,yfact };
+//	int z_send_next[3] = { 0, 0, 0 };
+//
+//	// Receive neighbors ----- odd-odd / even-even process communications (in x/y direction)
+//	int x_recv_next[3] = {-xfact,-xfact, 0 };
+//	int y_recv_next[3] = { 0,-yfact,-yfact };
+//	int z_recv_next[3] = { 0, 0, 0 };
+//
+//	// Construct sphere around chosen particle and write the particles with in (r_sweep = r_cut + r_sample) to configuration file
+//
+//	ivec3d mycell_glob;                      // chosen cell global coordinate
+//	ivec3d temp_glob, temp_loc, temp_block ; // temporary holder for  coordinates
+//
+//	mycell_glob = cobj.get_cell_glob_coord();
+//
+//	vec3d temp_pos, temp_vel, vec1, vec2;
+//	long temp_id; int temp_type;            // temporary holder for particle attributes
+//	double temp_mass, temp_epot, dist_check;
+//
+//	int xflag[6]={0,0,0,0,0,0};
+//	int yflag[6]={0,0,0,0,0,0};
+//	int zflag[6]={0,0,0,0,0,0};     // some utility flags for boundary checks
+//
+//	ivec3d g_max = mc_global_cell_dim;    // global cell array dimension - Max
+//	ivec3d g_min = {0,0,0};               // global cell array dimension - Min
+//
+//	//char * fname  = file_name ;                // file name as per simulation state from signature
+//
+//	// object definitions
+//	particle temp_part;
+//
+//	celltype sphere_cell; // list of particles from neighbor cells + own cell
+//	cellblock loc_obj;
+//
+//	// manipulator settings
+//	cout << fixed << right;
+//
+//	// initialize reference particle
+//	vec1 = pobj.get_myposition();
+//
+//	// get reference particle sweep boundary
+//	double ref_xmin = vec1.x - (mc_rsweep + mc_sphere_wall);
+//	double ref_ymin = vec1.y - (mc_rsweep + mc_sphere_wall);   // minimum boundary
+//	double ref_zmin = vec1.z - (mc_rsweep + mc_sphere_wall);
+//
+//    // global boundary check and flag initialization
+//
+//	// global_xmin
+//    if( temp_glob.x == g_min.x) xflag[0] =  -1;
+//    // global_xmax
+//    if( temp_glob.x == g_max.x) xflag[1] =   1;
+//    // global_ymin
+//    if( temp_glob.y == g_min.y) yflag[2] =  -1;
+//    // global_ymax
+//    if( temp_glob.y == g_max.y) yflag[3] =   1;
+//    // global_zmin
+//    if( temp_glob.z == g_min.z) zflag[4] =  -1;
+//    // global_zmax
+//    if( temp_glob.z == g_max.z) zflag[5] =   1;
+//
+//
+//    //********** loop over Neighbor cells list **************
+//
+//    // Later neighbor cells could be constructed with SMART nbl list and looped over the same
+//	for(int i=0; i<=mc_nbcells ; i++){
+//
+//          // getting nbl cells, cpu and cell address
+//
+//	      // get neighbor cell global coordinate
+//		  if(i!=mc_nbcells){  temp_glob = cobj.get_nbl_id(i); }
+//
+//	      // include chosen particle own cell
+//	      if(i==mc_nbcells){  temp_glob = mycell_glob; }
+//
+//	      // get cpu rank
+//	      int loc_rank = get_cpu_rank(temp_glob);
+//
+//	      // make changes using virtual topology
+//	      temp_block = get_cpu_gcoord(loc_rank);
+//
+//	      //  Foreign cpu cell
+//	      if(mc_prank != loc_rank) {
+//
+//	    	   // preliminary notifier
+//		       cout<<"Note from sphere construction pid: "<<mc_prank <<"\n"<<" Require process communication with : "<< loc_rank <<endl;
+//
+//		       // unpack datas from MPI packed buffers
+//               //****  NOTE MPI receive calls here
+//		       // into  buffer
+//		       // after receiving and unpacking
+//
+//		       long p_total; // should get from MPI receive
+//		       long p_c,v_c; // value holders
+//
+//		       // loop over n_particles received
+//
+//		       for( long k=0; k<p_total; k++ ){
+//
+//		    	  //  p_c =  k+(size*3);
+//		    	  //  v_c =  k+(size*3*3);
+//		    	  //  temp_type   = buffer[k];
+//		    	  //  temp_id     = buffer[k+size];
+//		    	  //  temp_mass   = buffer[k+(size*2)];
+//		    	  //  temp_epot   = buffer[k+(size*3)]; // NOTE: need to be verified
+//		    	  //  temp_pos.x  = buffer[p_c++] + (xflag[i] * mc_simbox_x.x);
+//		    	  //  temp_pos.y  = buffer[p_c++] + (yflag[i] * mc_simbox_y.y);
+//		    	  //  temp_pos.z  = buffer[p_c++] + (zflag[i] * mc_simbox_z.z);
+//		    	  //  temp_vel.x  = buffer[v_c++];
+//		    	  //  temp_vel.y  = buffer[v_c++];
+//		    	  //  temp_vel.z  = buffer[v_c++];
+//
+//
+//		          vec2 = {temp_pos.x,temp_pos.y,temp_pos.z}; // particle two position assignment
+//		          dist_check = distance_vect(vec1,vec2);
+//
+//		          //**************************************************************
+//		          //NOTE: to be updated in callee process to make dist_check
+//		          //**************************************************************
+//
+//		          // ----- cutoff check
+//
+//		          if(dist_check <= mc_rsweep + mc_sphere_wall){
+//
+//		        	  // declare virtual particles on sphere boundary
+//		        	  if( dist_check > mc_rsweep){
+//
+//                          // ignore placeholders on sphere wall
+//		        		  if (temp_type != 2 ){ // HC: now hardcoded for placeholders
+//
+//				        	  temp_part.set_mytype(temp_type + mc_real_types);  // HC: hardcoded for ntypes=3
+//				        	  temp_part.set_mynumber(temp_id);
+//				        	  temp_part.set_mymass(temp_mass);
+//
+//				        	  // shift filtered particle coordinates to reference sphere
+//				        	  temp_part.set_myposition((temp_pos.x - ref_xmin),(temp_pos.y - ref_ymin),(temp_pos.z - ref_zmin));
+//
+//				        	  temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
+//				        	  temp_part.set_myepot(temp_epot);
+//
+//				        	  sphere_cell.add_particle(temp_part);
+//
+//		        		  }
+//		        	  }
+//		        	  else{ // include all particles inside mc_rsweep
+//
+//			        	  temp_part.set_mytype(temp_type);
+//			        	  temp_part.set_mynumber(temp_id);
+//			        	  temp_part.set_mymass(temp_mass);
+//
+//			        	  // shift filtered particle coordinates to reference sphere
+//			        	  temp_part.set_myposition((temp_pos.x - ref_xmin),(temp_pos.y - ref_ymin),(temp_pos.z - ref_zmin));
+//
+//			        	  temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
+//			        	  temp_part.set_myepot(temp_epot);
+//
+//			        	  sphere_cell.add_particle(temp_part);
+//
+//		        	  }
+//
+//		          } // cut-off check
+//
+//		       } // end of particles loop
+//
+//	      }//end of cpu foreign cells
+//
+//
+//	      // cpu native cells
+//	      else{
+//
+//		       // get cell local coordinate
+//		       ivec3d cell_loc_coord = get_cell_loc_coord(temp_glob,temp_block);
+//
+//		       // to get memory index of cell in cell list
+//		       int cell_index = cell_loc_coord.x + (cell_loc_coord.y * mc_cpu_cell_dim.x) + (cell_loc_coord.z * mc_cpu_cell_dim.x * mc_cpu_cell_dim.x);
+//
+//		       // get particles count
+//		       long p_total = loc_obj.get_cell(cell_index).get_nparticles();
+//
+//		       for( long pcount; pcount<p_total; pcount++ ){
+//
+//		    	   // reading values
+//		    	   temp_id    = loc_obj.get_cell(cell_index).get_particle(pcount).get_mynumber();
+//		    	   temp_type  = loc_obj.get_cell(cell_index).get_particle(pcount).get_mytype();
+//		    	   temp_mass  = loc_obj.get_cell(cell_index).get_particle(pcount).get_mymass();
+//		    	   temp_pos   = loc_obj.get_cell(cell_index).get_particle(pcount).get_myposition();
+//		    	   temp_vel   = loc_obj.get_cell(cell_index).get_particle(pcount).get_myvelocity();
+//		    	   temp_epot  = loc_obj.get_cell(cell_index).get_particle(pcount).get_myepot();
+//
+//		    	   // particle 2 position assignment
+//			       vec2 = temp_pos;
+//
+//			       dist_check = distance_vect(vec1,vec2);
+//
+//			          // ----- cutoff check
+//
+//			          //NOTE: SQUARES should be included (check distance between vectors routine)
+//			          if(dist_check <= mc_rsweep + mc_sphere_wall){
+//
+//			        	  // declare virtual particles on sphere boundary
+//			        	  if( dist_check > mc_rsweep){
+//
+//	                          // ignore placeholders on sphere wall
+//			        		  if (temp_type != 2 ){ // HC: now hardcoded for placeholders
+//                                  // introduce virtual particles
+//					        	  temp_part.set_mytype(temp_type + 3);  // HC: hardcoded for ntypes=3
+//					        	  temp_part.set_mynumber(temp_id);
+//					        	  temp_part.set_mymass(temp_mass);
+//
+//					        	  // shift filtered particle coordinates to reference sphere
+//					        	  temp_part.set_myposition((temp_pos.x - ref_xmin),(temp_pos.y - ref_ymin),(temp_pos.z - ref_zmin));
+//
+//					        	  temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
+//					        	  temp_part.set_myepot(temp_epot);
+//
+//					        	  sphere_cell.add_particle(temp_part);
+//
+//			        		  }
+//			        	  }
+//			        	  else{ // include all particles inside mc_rsweep
+//
+//				        	  temp_part.set_mytype(temp_type);
+//				        	  temp_part.set_mynumber(temp_id);
+//				        	  temp_part.set_mymass(temp_mass);
+//
+//				        	  // shift filtered particle coordinates to reference sphere
+//				        	  temp_part.set_myposition((temp_pos.x - ref_xmin),(temp_pos.y - ref_ymin),(temp_pos.z - ref_zmin));
+//
+//				        	  temp_part.set_myvelocity(temp_vel.x,temp_vel.y,temp_vel.z);
+//				        	  temp_part.set_myepot(temp_epot);
+//
+//				        	  sphere_cell.add_particle(temp_part);
+//
+//			        	  }
+//
+//			          } // cut-off check
+//
+//		       } // end of particles loop
+//
+//          }// end of native cell
+//
+//	}// end of sphere cell list - 1
+//
+//	// shift chosen particle coordinate to ref.sphere
+//	particle temp_pobj = pobj;
+//	vec3d temp_pos = temp_pobj.get_myposition();
+//	temp_pobj.set_myposition(temp_pos.x-ref_xmin,temp_pos.y-ref_ymin,temp_pos.z-ref_zmin);
+//
+//	// add the randomly selected reference particle
+//	sphere_cell.add_particle(temp_pobj);
+//
+//
+//
+//
+//
+//
+//	// * THE FOLLOWING PART COULD BE USED AS SUCH
+//	// file writing methods
+//
+//	long my_number;
+//	int my_type;
+//    double my_mass, my_epot;
+//    vec3d my_pos, my_vel;
+//
+//    // opening file stream object
+//    ofstream fout(filename, ios_base::out);
+//
+//    cout<<" Sphere constructor writing to file : " << filename<<endl;
+//
+//    //********** loop over revised sphere cell list - 2 **************
+//
+//	long fp_total = sphere_cell.get_nparticles();
+//
+//    for(long fp; fp<fp_total; fp++){
+//
+//        	  my_number  = sphere_cell.get_particle(fp).get_mynumber();
+//        	  my_type    = sphere_cell.get_particle(fp).get_mytype();
+//        	  my_mass    = sphere_cell.get_particle(fp).get_mymass();
+//        	  my_pos     = sphere_cell.get_particle(fp).get_myposition();
+//        	  my_vel     = sphere_cell.get_particle(fp).get_myvelocity(); // optional with #ifdef or so
+//              my_epot    = sphere_cell.get_particle(fp).get_myepot();
+//
+//        	  // file flush
+//        	  fout << setw(8) << my_number
+//        		   << setw(6) << my_type
+//        		   << setw(6) << setprecision(8) << my_mass
+//        		   << setw(6) << setprecision(8) << my_pos.x
+//        		   << setw(6) << setprecision(8) << my_pos.y
+//        		   << setw(6) << setprecision(8) << my_pos.z
+//        		   << setw(6) << setprecision(8) << my_vel.x
+//        		   << setw(6) << setprecision(8) << my_vel.y
+//        		   << setw(6) << setprecision(8) << my_vel.z
+//        		   << setw(6) << setprecision(8) << my_epot
+//        		   << endl;
+//
+//    }
+//
+//	fout.close(); // closing outfile connection
+//
+//}
 
 void make_mc_nblist(celltype cobj){
 
 	//: DNOTE: later additional signature to identify zone and nbl will be constructed accordingly
 
 	 // create neighbor list for the given cell
-
 	 ivec3d g_max = mc_global_cell_dim;    // global cell array dimension - Max
 	 ivec3d g_min = {0,0,0};               // global cell array dimension - Min
+
      //**************************************
 	 // NOTE ** Check whether g_min = {1,1,1};
 	 //****************************************
 
+	 // my cell global coordinate
 	 ivec3d ref = cobj.get_cell_glob_coord();
 
-	 // my layer cells
-	 ivec3d ip_left,ip_right,ip_back,ip_front,ip_east,ip_west,ip_north,ip_south;
-	 // top layer cells
-	 ivec3d ip_top,ip_tleft,ip_tright,ip_tback,ip_tfront,ip_teast,ip_twest,ip_tnorth,ip_tsouth;
-	 // bottom layer cells
-	 ivec3d ip_bottom,ip_bleft,ip_bright,ip_bback,ip_bfront,ip_beast,ip_bwest,ip_bnorth,ip_bsouth;
+	 // neighbor vectors
+	 ivec3d vec1,vec2,vec3,vec4,vec5,vec6,vec7,vec8,vec9;
 
+	 int nb_con =0; // neighbor counter
 
-	 // general nbl assignment
+	 int x_plus=0, y_plus=0, x_minus=0, y_minus=0;
+	 int z_val=0;        // z value holder
+	 int z_dir[3] = {0,-1,+1};
 
-	 // my layer neighbors
-	 ip_left.x  = --ref.x;       ip_left.y  = ref.y;      ip_left.z    = ref.z;
-	 ip_right.x = ++ref.x;       ip_right.y = ref.y;      ip_right.z   = ref.z;
-	 ip_back.x  = ref.x;         ip_back.y  = --ref.y;    ip_back.z    = ref.z;
-	 ip_front.x = ref.x;         ip_front.y = ++ref.y;    ip_front.z   = ref.z;
-	 ip_east.x  = ++ref.x;       ip_east.y  = --ref.y;    ip_east.z    = ref.z;
-	 ip_west.x  = --ref.x;       ip_west.y  = ++ref.y;    ip_west.z    = ref.z;
-	 ip_north.x = ++ref.x;       ip_north.y = ++ref.y;    ip_north.z   = ref.z;
-	 ip_south.x = --ref.x;       ip_south.y = --ref.y;    ip_south.z   = ref.z;
+	 y_minus = --ref.y; if(ref.y == g_min.y) { y_minus = g_max.y;}
+	 y_plus  = ++ref.y; if(ref.y == g_max.y) { y_plus = g_min.y;}
 
+	 x_minus = --ref.x; if(ref.x == g_min.x) { x_minus = g_max.x;}
+	 x_plus  = ++ref.x; if(ref.x == g_max.x) { x_plus = g_min.x;}
 
-	 // my top layer neighbors
-	 ip_top.x    = ref.x;        ip_top.y    = ref.y;      ip_top.z     = ++ref.z;
-	 ip_tleft.x  = --ref.x;      ip_tleft.y  = ref.y;      ip_tleft.z   = ++ref.z;
-	 ip_tright.x = ++ref.x;      ip_tright.y = ref.y;      ip_tright.z  = ++ref.z;
-	 ip_tback.x  = ref.x;        ip_tback.y  = --ref.y;    ip_tback.z   = ++ref.z;
-	 ip_tfront.x = ref.x;        ip_tfront.y = ++ref.y;    ip_tfront.z  = ++ref.z;
-	 ip_teast.x  = ++ref.x;      ip_teast.y  = --ref.y;    ip_teast.z   = ++ref.z;
-	 ip_twest.x  = --ref.x;      ip_twest.y  = ++ref.y;    ip_twest.z   = ++ref.z;
-	 ip_tnorth.x = ++ref.x;      ip_tnorth.y = ++ref.y;    ip_tnorth.z  = ++ref.z;
-	 ip_tsouth.x = --ref.x;      ip_tsouth.y = --ref.y;    ip_tsouth.z  = ++ref.z;
+	 // loop over three possible z-directions
+	 for (int i=0; i<3; i++){
 
+		 z_val = ref.z+z_dir[i];
+		 if((i==1) && (ref.z==g_min.z)) {z_val = g_max.z; }
+		 if((i==2) && (ref.z==g_max.z)) {z_val = g_min.z; }
 
-
-	 // my bottom layer neighbors
-	 ip_bottom.x = ref.x;       ip_bottom.y = ref.y;      ip_bottom.z   = --ref.z;
-	 ip_bleft.x  = --ref.x;     ip_bleft.y  = ref.y;      ip_bleft.z    = --ref.z;
-	 ip_bright.x = ++ref.x;     ip_bright.y = ref.y;      ip_bright.z   = --ref.z;
-	 ip_bback.x  = ref.x;       ip_bback.y  = --ref.y;    ip_bback.z    = --ref.z;
-	 ip_bfront.x = ref.x;       ip_bfront.y = ++ref.y;    ip_bfront.z   = --ref.z;
-	 ip_beast.x  = ++ref.x;     ip_beast.y  = --ref.y;    ip_beast.z    = --ref.z;
-	 ip_bwest.x  = --ref.x;     ip_bwest.y  = ++ref.y;    ip_bwest.z    = --ref.z;
-	 ip_bnorth.x = ++ref.x;     ip_bnorth.y = ++ref.y;    ip_bnorth.z   = --ref.z;
-	 ip_bsouth.x = --ref.x;     ip_bsouth.y = --ref.y;    ip_bsouth.z   = --ref.z;
-
-
-	 // cell on x boundary
-	 if(ref.x == g_min.x){
-		 // my layer
-		 ip_left.x   = g_max.x;
-		 ip_west.x   = g_max.x;
-		 ip_south.x  = g_max.x;
-		 // my top layer
-		 ip_tleft.x  = g_max.x;
-		 ip_twest.x  = g_max.x;
-		 ip_tsouth.x = g_max.x;
-		 // my bottom layer
-		 ip_bleft.x   = g_max.x;
-		 ip_bwest.x   = g_max.x;
-		 ip_bsouth.x  = g_max.x;
-
+		 vec1.x = ref.x;      vec1.y  = ref.y;      vec1.z = z_val;     cobj.add_neighbor(nb_con++,vec1); // position
+		 vec2.x = x_minus;    vec2.y  = ref.y;      vec2.z = z_val;     cobj.add_neighbor(nb_con++,vec2); // left
+		 vec3.x = x_plus;     vec3.y  = ref.y;      vec3.z = z_val;     cobj.add_neighbor(nb_con++,vec3); // right
+		 vec4.x = ref.x;      vec4.y  = y_plus;     vec4.z = z_val;     cobj.add_neighbor(nb_con++,vec4); // front
+		 vec5.x = ref.x;      vec5.y  = y_minus;    vec5.z = z_val;     cobj.add_neighbor(nb_con++,vec5); // back
+		 vec6.x  = x_plus;    vec6.y  = y_minus;    vec6.z = z_val;     cobj.add_neighbor(nb_con++,vec6); // east
+		 vec7.x  = x_minus;   vec7.y  = y_plus;     vec7.z = z_val;     cobj.add_neighbor(nb_con++,vec7); // west
+		 vec8.x = x_plus;     vec8.y  = y_plus;     vec8.z = z_val;     cobj.add_neighbor(nb_con++,vec8); // north
+		 vec9.x = x_minus;    vec9.y  = y_minus;    vec9.z = z_val;     cobj.add_neighbor(nb_con++,vec9); // south
 	 }
-	 if(ref.x == g_max.x){
-		 // my layer
-		 ip_right.x  = g_min.x;
-		 ip_north.x  = g_min.x;
-		 ip_east.x   = g_min.x;
-		 // my top layer
-		 ip_tright.x  = g_min.x;
-		 ip_tnorth.x  = g_min.x;
-		 ip_teast.x   = g_min.x;
-         // my bottom layer
-		 ip_bright.x  = g_min.x;
-		 ip_bnorth.x  = g_min.x;
-		 ip_beast.x   = g_min.x;
-
-	 }
-
-	 // cell on y boundary
-	 if(ref.y == g_min.y){
-		 // my layer
-		 ip_south.y  = g_max.y;
-		 ip_back.y   = g_max.y;
-		 ip_east.y   = g_max.y;
-		 // my top layer
-		 ip_tsouth.y  = g_max.y;
-		 ip_tback.y   = g_max.y;
-		 ip_teast.y   = g_max.y;
-		 // my bottom layer
-		 ip_bsouth.y  = g_max.y;
-		 ip_bback.y   = g_max.y;
-		 ip_beast.y   = g_max.y;
-
-	 }
-	 if(ref.y == g_max.y) {
-		 // my layer
-		 ip_west.y   = g_min.y;
-		 ip_front.y  = g_min.y;
-		 ip_north.y  = g_min.y;
-		 // my top layer
-		 ip_twest.y   = g_min.y;
-		 ip_tfront.y  = g_min.y;
-		 ip_tnorth.y  = g_min.y;
-         // my bottom layer
-		 ip_bwest.y   = g_min.y;
-		 ip_bfront.y  = g_min.y;
-		 ip_bnorth.y  = g_min.y;
-
-	 }
-
-	 // cell on z boundary
-	 if(ref.z == g_min.z){
-
-		 ip_bottom.z = g_max.z;
-		 ip_bleft.z  = g_max.z;
-		 ip_bright.z = g_max.z;
-		 ip_bback.z  = g_max.z;
-		 ip_bfront.z = g_max.z;
-		 ip_beast.z  = g_max.z;
-		 ip_bwest.z  = g_max.z;
-		 ip_bnorth.z = g_max.z;
-		 ip_bsouth.z = g_max.z;
-
-	 }
-	 if(ref.z == g_max.z){
-
-		 ip_top.z    = g_min.z;
-		 ip_tleft.z  = g_min.z;
-		 ip_tright.z = g_min.z;
-		 ip_tback.z  = g_min.z;
-		 ip_tfront.z = g_min.z;
-		 ip_teast.z  = g_min.z;
-		 ip_twest.z  = g_min.z;
-		 ip_tnorth.z = g_min.z;
-		 ip_tsouth.z = g_min.z;
-
-	 }
-
-     // assigning nbl coordinates to cell object
-
-	 // my layer
-	 cobj.set_my_left(ip_left);
-	 cobj.set_my_right(ip_right);
-	 cobj.set_my_back(ip_back);
-	 cobj.set_my_front(ip_front);
-	 cobj.set_my_east(ip_east);
-	 cobj.set_my_west(ip_west);
-	 cobj.set_my_north(ip_north);
-	 cobj.set_my_south(ip_south);
-
-	 // my top layer
-	 cobj.set_my_top(ip_top);
-	 cobj.set_top_left(ip_tleft);
-	 cobj.set_top_right(ip_tright);
-	 cobj.set_top_back(ip_tback);
-	 cobj.set_top_front(ip_tfront);
-	 cobj.set_top_east(ip_teast);
-	 cobj.set_top_west(ip_twest);
-	 cobj.set_top_north(ip_tnorth);
-	 cobj.set_top_south(ip_tsouth);
-
-	 // my bottom layer
-	 cobj.set_my_bottom(ip_bottom);
-	 cobj.set_bottom_left(ip_bleft);
-	 cobj.set_bottom_right(ip_bright);
-	 cobj.set_bottom_back(ip_bback);
-	 cobj.set_bottom_front(ip_bfront);
-	 cobj.set_bottom_east(ip_beast);
-	 cobj.set_bottom_west(ip_bwest);
-	 cobj.set_bottom_north(ip_bnorth);
-	 cobj.set_bottom_south(ip_bsouth);
-
 
 }
 
 ivec3d get_cpu_gcoord(int myrank){
 
+	// NEED CHANGES (can be computed from MPI Virtual topology)
+
 	// compute cpu global coordinate based on process rank
 
-	ivec3d cpu_array[mc_ncpus];  // CHECK: have to be initialized via corresponding method
-	int count=0;
+	ivec3d cpu_array[mc_ncpus], my_coord;  // CHECK: have to be initialized via corresponding method
+	int grid_coord[3];
 
-	for(int i=0;i<stacks_block;i++ ){
-		for(int j=0;j<rows_block;j++){
-			for(int k=0;k<cols_block;k++){
+	MPI_Cart_coords(comm_name,myrank,3,grid_coord);
+	my_coord.x = grid_coord[0];
+	my_coord.y = grid_coord[1];
+	my_coord.z = grid_coord[2];
 
-				cpu_array[count].x = k;
-				cpu_array[count].y = j;
-				cpu_array[count].z = i;
-
-				count++;
-			}
-		}
-	}
-	return cpu_array[myrank];
+	//return cpu_array[myrank];
+	return my_coord;
 }
 
 ivec3d get_cell_loc_coord(ivec3d glob_coord, ivec3d cpu_glob_pos){
@@ -795,6 +935,8 @@ ivec3d get_cell_loc_coord(ivec3d glob_coord, ivec3d cpu_glob_pos){
 }
 
 void make_particles(cellblock loc_obj){
+
+	 // DO CHECKING
 
      // method for creating particle objects and fill in cell container
 
@@ -886,6 +1028,8 @@ void make_particles(cellblock loc_obj){
 
 void fill_mc_container(cellblock loc_obj){
 
+	// DO CHECKING
+
 	long par_count=0;
 
 	long stl_counter = 0;
@@ -925,6 +1069,8 @@ void fill_mc_container(cellblock loc_obj){
 
 
 void create_maxwell_velocities(cellblock loc_obj,double mc_temp, ivec3d*  mc_restriction){
+
+	  // DO CHECKING
 
 	  //   create and fill initial velocities for particles
 
@@ -1032,6 +1178,8 @@ void create_maxwell_velocities(cellblock loc_obj,double mc_temp, ivec3d*  mc_res
 
 void make_cells(cellblock loc_obj){
 
+	// DO CHECKING
+
     //    method for creating cell objects and fill in cellblock container
 	//    should assign cell boundary and ids correctly from the field
 
@@ -1041,23 +1189,21 @@ void make_cells(cellblock loc_obj){
 	int cell_no     = 0;
 
 	// I: some method calls
+	//  (could be hardcoded for Moving window approach as nxn )
 	stack_total   = calc_cpu_stack_total();
 	ncells_stack  = calc_ncells_stack(); // NOTE: verify requirement
 	ncells_cpu    = calc_ncells_cpu();
 	int row_total = calc_cpu_row_total();
 	int col_total = calc_cpu_col_total();
 
-//	vec3d min_bound = {0.0,0.0,0.0};
-//  vec3d max_bound = {0.0,0.0,0.0};
-
-    ivec3d cell_gcoord = {0,0,0}; // initialization
+    ivec3d cell_gcoord = {0,0,0}; // initialization of cell global coordinate
+    ivec3d cell_lcoord = {0,0,0}; // initialization of cell local coordinate
 
     int cells_stack=0;
+    int cell_counter = 0;
 
-
-    int x_fac = cpu_gcoord.x;
-    int y_fac = cpu_gcoord.y;
-    int z_fac = cpu_gcoord.z;
+    // process/cpu global position (in MPI cartesian topology system)
+    cpu_gcoord = get_cpu_gcoord(mc_prank);
 
     //*****************************************************************
     // create cell objects and fill into cell block container eventually
@@ -1076,22 +1222,30 @@ void make_cells(cellblock loc_obj){
 
 				  celltype cell_obj;
 
-        		  cell_no += (stack_no * cells_stack) + ( ncells_cpu * mc_prank ); // cell id computation
+        		  //cell_no += (stack_no * ncells_stack) + ( ncells_cpu * mc_prank ); // cell id computation
 
-        		  cell_gcoord.x = col_count +  (col_total * x_fac);
+                  // cell id computation
+        		  cell_no = cell_counter+ ( ncells_cpu * mc_prank ); // cell id computation
 
-        		  cell_gcoord.y = row_count +  (row_total * y_fac);
+        		  // cell global coordinates
+        		  cell_gcoord.x = col_count +  (col_total * cpu_gcoord.x);
+        		  cell_gcoord.y = row_count +  (row_total * cpu_gcoord.y);
+        		  cell_gcoord.z = stack_no  +  (stack_total * cpu_gcoord.z);
 
-        		  cell_gcoord.z = stack_no  +  (stack_total * z_fac);
+
+        		  // cell local coordinate
+        		  cell_lcoord = get_cell_loc_coord(cell_gcoord,cpu_gcoord);
 
         		  // assign values
        		   	  cell_obj.set_cell_id(cell_no);
 
        		      cell_obj.set_glob_coord(cell_gcoord); // setting global cell coordinate
 
+       		      cell_obj.set_loc_coord(cell_lcoord);  // setting local cell coordinate
+
        		      loc_obj.add_cell(cell_obj); // adding cell into cel_block
 
-			      cell_no++; //  updating cell id
+       		      cell_counter++; //  incrementing cell counter
 
 			}//column_count
 
@@ -1102,6 +1256,8 @@ void make_cells(cellblock loc_obj){
 } // make_cells
 
 void count_particles(cellblock loc_obj){
+
+	// CHECK IF REQUIRED
 
 	celltype cell_obj;
 	long par_count=0;
@@ -1135,6 +1291,7 @@ void count_particles(cellblock loc_obj){
 
 void calc_mc_cpu_box(){
 
+	// DO CHECKING
 	//  computes cpu_box physical dimensions
 
 
@@ -1230,6 +1387,7 @@ ivec3d cell_coordinate(double x, double y, double z){
 
 void calc_cpu_block_limits(){
 
+	// CHECK IF NECESSARY
 	// NOTE : COULD BE REMOVED
     //*********************************************************
     // seemingly not important
@@ -1343,6 +1501,7 @@ void calc_block_dim(){
 
 int get_cpu_rank(ivec3d cell_coord){
 
+	// NOT REQUIRED : (COMPUTE FROM MPI_Comm_rank())
 	// method to compute cpu_rank from global cell coordinates
 
 	ivec3d red_vec;
@@ -1434,7 +1593,8 @@ double distance_vect(vec3d v1,vec3d v2){
 	temp_v.y = v2.y - v1.y ;
 	temp_v.z = v2.z - v1.z ;
 
-	dist = sqrt(scalar_prod(temp_v,temp_v));
+	// compute distance as sum of square
+	dist = (scalar_prod(temp_v,temp_v));
 
 	return dist;
 }

@@ -25,7 +25,7 @@ void do_local_mdrun(string bin_name,string param_name);
 
 particle sample_zone(cellblock bobj,int win_id);
 
-void read_update_config (char* fname, particle pobj);
+void read_update_config (int accep_tag,int win_id,char* fname, particle pobj);
 
 void construct_sphere (particle pobj, cellblock bobj, int win_id,char* filename); // calling method - sampler would have signatures
 
@@ -72,6 +72,8 @@ int calc_cpu_stack_total(void);
 void calc_block_dim(void);
 
 int get_cpu_rank(ivec3d cell_coord);
+
+ivec3d calc_cpu_coord(ivec3d cell_coord);
 
 double get_gaussian(double sigma);
 

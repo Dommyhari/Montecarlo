@@ -131,8 +131,10 @@ extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumb
     // construct neighbor list for chosen cell
     make_mc_nblist(cell_obj);
 
+    // sample window id
+    int sample_id= 0;
     // particle instance
-    particle sam_particle = sample_zone(c_obj.get_cell(0));
+    particle sam_particle = sample_zone(c_obj,sample_id);
 
 
     //run local MD

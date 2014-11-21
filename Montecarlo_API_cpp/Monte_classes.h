@@ -85,10 +85,11 @@ class particle{
 
 class celltype{
 
-	int cell_id;             // cell number
-	long nparticles;         // total no of particles
-	ivec3d gcoord;           // cell global coordinates
-	ivec3d lcoord;           // cell local  coordinates
+	int cell_id;              // cell number
+	long nparticles;          // total no of particles
+	ivec3d gcoord;            // cell global coordinates
+	ivec3d lcoord;            // cell local  coordinates
+    int sample_fact=0;       // sample factor (how frequent a cell is sampled)
 
 	vector<particle> cell;
 
@@ -107,10 +108,11 @@ class celltype{
         void set_glob_coord(ivec3d cell_gcoord);
         void set_loc_coord(ivec3d cell_lcoord);
         void add_neighbor(int id, ivec3d position);
+        void add_sample(void);
 
         // if required add other possible neighbor set methods
 
-        void add_particle(particle p)                  { cell.push_back(p); }
+        void add_particle(particle p)                   { cell.push_back(p); }
         void delete_particle(particle p, int index)    { cell.erase(cell.begin()+ index);}
 
 	    // get methods
@@ -120,6 +122,7 @@ class celltype{
 	    ivec3d get_cell_glob_coord()           { return gcoord;         }
         ivec3d get_cell_loc_coord()            { return lcoord;         }
 
+        int get_sample_factor()                { return sample_fact;}
 
 	    //*******************************
 	    // NOTE: if required improvise it..

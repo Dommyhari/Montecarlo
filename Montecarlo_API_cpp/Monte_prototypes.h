@@ -19,13 +19,13 @@ int get_cpu_neighbor(int inde0,int inde1,int inde2);
 
 void setup_config(void);
 
-void update_particle(int  cell_id, particle ref_atom );
+void update_particle(cellblock bobj,int  cell_id, particle ref_atom );
 
 void do_local_mdrun(string bin_name,string param_name);
 
 particle sample_zone(cellblock bobj,int win_id);
 
-void read_update_config (int accep_tag,int win_id,char* fname, particle pobj);
+void read_update_config (int accep_tag,int win_id,char* fname, particle pobj,cellblock bobj);
 
 void construct_sphere (particle pobj, cellblock bobj, int win_id,char* filename); // calling method - sampler would have signatures
 

@@ -141,7 +141,10 @@ extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumb
     do_local_mdrun(md_binary,md_param);
 
     // if accept update
-    update_particle(cell_obj.get_cell_id(),sam_particle);
+    //update_particle(cell_obj.get_cell_id(),sam_particle);
+
+    // fill mc container
+    fill_mc_container(c_obj);
 
 	// Data mirroring procedure - Assigning pointers
 

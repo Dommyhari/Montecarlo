@@ -71,6 +71,11 @@ void celltype::set_loc_coord(ivec3d cell_lcoord){
 void celltype::add_neighbor(int id, ivec3d position){
 	   nbl_list[id] = position;
 }
+
+void celltype::add_sample(void){
+	   sample_fact += 1;
+}
+
 // class cellblock methods
 
 

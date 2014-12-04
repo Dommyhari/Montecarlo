@@ -10,7 +10,8 @@
 
 using namespace std;
 
-int get_cpu_neighbor(int inde0,int inde1,int inde2){
+// seems OK
+int get_cpu_rank(int inde0,int inde1,int inde2){
 	// gives my cpu rank with my own coordinates
 	int nb_grid_coord[3],nb_rank;
     nb_grid_coord[0] = inde0;
@@ -23,6 +24,7 @@ int get_cpu_neighbor(int inde0,int inde1,int inde2){
 
 }
 
+// seems OK
 void setup_config(){
 
     // compute Montecarlo cell dimension
@@ -42,16 +44,16 @@ void setup_config(){
 
 	// all cpu global position
 
-	// change it accordingly to compute from Vitrual topology
-	get_cpu_gcoord(mc_prank);
+	// change it accordingly to compute from Virtual topology
+	cpu_gcoord = get_cpu_gcoord(mc_prank);
 
 	// compute domain block dimension
 	calc_block_dim();
 
 }
 
+// seems OK
 void update_particle( cellblock bobj,int  cell_id, particle ref_atom ){
-
 
 	   // method for updating particle attributes for the
 	   // given cell block,cell index and particle id
@@ -61,7 +63,6 @@ void update_particle( cellblock bobj,int  cell_id, particle ref_atom ){
 
 	   // get particles count
 	   long p_count = bobj.get_cell(cell_id).get_nparticles();
-
 	   long loc_id = ref_atom.get_mynumber();
 
 	   // loop over particles in cell
@@ -77,6 +78,8 @@ void update_particle( cellblock bobj,int  cell_id, particle ref_atom ){
 
 }
 
+// seems OK
+// pass IMD_executable and param file as arguments
 void do_local_mdrun(string bin_name,string param_name){
 
 	       // method to run local MD simulation
@@ -84,21 +87,22 @@ void do_local_mdrun(string bin_name,string param_name){
 
 	// make binary and parameter file clone
 
-	string srank = to_string(mc_prank);
-	string spath   =  "./" ;
-	string space   =  "  " ;
-    string verflag =  " -p ";
-    string nline   =  " \n ";
-    string uscore  =  "_";
-    string copy_cmd  = "cp"; // bash command
-    string remov_cmd = "rm"; // bash command
+	string srank    = to_string(mc_prank);
+	string spath    =  "./" ;
+	string space    =  "  " ;
+    string verflag  =  " -p ";
+    string nline    =  " \n ";
+    string uscore   =  "_";
+    string f_extent =  ".param";
+    string copy_cmd = "cp"; // bash command
+    string remov_cmd= "rm"; // bash command
 
 	string new_bin   = bin_name + uscore + srank ;
-    string new_param = param_name + uscore + srank;
+    string new_param = param_name + uscore + srank + f_extent;
 
     // copy commands
     string cmd1 = copy_cmd + space + bin_name +space + new_bin;
-    string cmd2 = copy_cmd + space + param_name +space + new_param;
+    string cmd2 = copy_cmd + space + param_name+f_extent +space + new_param;
 
     // remove commands
     string cmd3 = remov_cmd + space + new_bin;
@@ -123,32 +127,34 @@ void do_local_mdrun(string bin_name,string param_name){
 	//file removing
     system(cmd3_ptr); // remove binary clone
     system(cmd4_ptr); // remove param clone
-
 }
 
+// seems OK
 // sample_seed parameter have to be used at callee function/method
 particle sample_zone(cellblock bobj,int win_id){
 
 	// NEED CHANGES
 
-	celltype cobj;
-	celltype sample_cells[8];
+	celltype cobj;             // cell object
+	celltype sample_cells[8];  // sample cells for given window type
 
 	// local cell coordinates zone
     ivec3d test;
     int count=0,rand_cell;
+    long ncells = bobj.get_ncells();
 
     ivec6d zone_limit[8];
 
+    // zone_limit: define sample window positions (x,y,z)
     // NOTE: HARDCODED FOR 8 CELLS IN A WINDOW
-    zone_limit[0] = {0,1,0,1,0,1};
-    zone_limit[1] = {0,1,0,1,1,2};
-    zone_limit[2] = {1,2,0,1,0,1};
-    zone_limit[3] = {1,2,0,1,1,2};
-    zone_limit[4] = {0,1,1,2,0,1};
-    zone_limit[5] = {0,1,1,2,1,2};
-    zone_limit[6] = {1,2,1,2,0,1};
-    zone_limit[7] = {1,2,1,2,1,2};
+    zone_limit[0] = {0,1,0,1,0,1}; // sample window 1
+    zone_limit[1] = {0,1,0,1,1,2}; // sample window 2
+    zone_limit[2] = {1,2,0,1,0,1}; // sample window 3
+    zone_limit[3] = {1,2,0,1,1,2}; // sample window 4
+    zone_limit[4] = {0,1,1,2,0,1}; // sample window 5
+    zone_limit[5] = {0,1,1,2,1,2}; // sample window 6
+    zone_limit[6] = {1,2,1,2,0,1}; // sample window 7
+    zone_limit[7] = {1,2,1,2,1,2}; // sample window 8
 
 
     // prepare cell list as per sample window id
@@ -158,7 +164,7 @@ particle sample_zone(cellblock bobj,int win_id){
     		for(int k=zone_limit[win_id].zmin;k<=zone_limit[win_id].zmax;k++){
 
     			test.x = i; test.y = j; test.z = k;
-    			sample_cells[count] = bobj.cell_with_lcoord(test);
+    			sample_cells[count] = bobj.cell_with_lcoord(test,ncells);
 
                 count++;
     		}
@@ -168,12 +174,9 @@ particle sample_zone(cellblock bobj,int win_id){
 	long rand_no,n_particles;
 	particle atom;
 
-	//srand(time(NULL));
-	//srand(sample_seed);
-
+    // choose one cell in random (belong to sample window)
 	// NOTE: HARDCODED FOR 8 CELLS IN A WINDOW
 	rand_cell = rand()%8;
-
 	cobj = sample_cells[rand_cell];
 
 	do{
@@ -185,19 +188,17 @@ particle sample_zone(cellblock bobj,int win_id){
 
 	atom = cobj.get_particle(rand_no);
 
-
-
-	// make change only in particle object
+	// make change only in particle object instance
 	// swapping placeholder into carbon
 	// HC: hardcoded to 1
     atom.set_mytype(1);
-
 
     // construct sphere around selected particle
     construct_sphere(atom,bobj,win_id,file_name);
 
 	return atom;
 }
+
 
 void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cellblock bobj){
 
@@ -246,10 +247,10 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
     // neighbors to whom should I send updated configuration (from those I requested sphere portions (if any))
     for (int i=0; i<4; i++){
-    	rank_list[i] = get_cpu_neighbor(x_send_phase[i],y_send_phase[i],z_send_phase[i]);
+    	rank_list[i] = get_cpu_rank(x_send_phase[i],y_send_phase[i],z_send_phase[i]);
     }
     for (int i=4; i<7; i++){
-    	rank_list[i] = get_cpu_neighbor(x_send_next[i],y_send_next[i],z_send_next[i]);
+    	rank_list[i] = get_cpu_rank(x_send_next[i],y_send_next[i],z_send_next[i]);
     }
 
     //******************************************************************************
@@ -279,8 +280,8 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	my_buffer={my_0,my_1,my_2,my_3,my_4,my_5,my_6};
 
     //********************************************************************************
-
 	// open and read file only if configuration get accepted
+    //********************************************************************************
 
 	if(accep_tag){
 
@@ -309,6 +310,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
                   continue;
             }
 
+            // read and fill buffer
             while( !fin.eof()){ // end of file check
 
     	              // reading         // pushing
@@ -392,7 +394,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
          		    // CPU global coordinate from cell global coordinate
          		    nb_cpu_gcoord = calc_cpu_coord(cell_glob_coord) ;
          		    // CPU rank
-         		    loc_rank = get_cpu_neighbor(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z);
+         		    loc_rank = get_cpu_rank(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z);
 
          		    // particle belongs to neighbor
          		    if (loc_rank != mc_prank){
@@ -474,7 +476,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	//****************************************************************
 
 	// my cpu coordinate
-	cpu_gcoord = get_cpu_gcoord(mc_prank);
+	//cpu_gcoord = get_cpu_gcoord(mc_prank);
 	int x = cpu_gcoord.x; int y = cpu_gcoord.y; int z = cpu_gcoord.z;
 
 	// z direction communication
@@ -483,14 +485,14 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	     if (z%2==0){
 
 	       // front comm
-	       MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),14,comm_name);
-	       MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),15,comm_name,&status);
+	       MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),14,comm_name);
+	       MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),15,comm_name,&status);
 
 	     }
 	     else{
 
-	       MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),14,comm_name,&status);
-	       MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),15,comm_name);
+	       MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),14,comm_name,&status);
+	       MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),15,comm_name);
 
 	     }
 	}
@@ -500,21 +502,21 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	// x direction communication
 	if (x%2 == 0){
 	         // right & left comm
-	       MPI_Send(nb_buffer[4],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),16,comm_name);
-	       MPI_Recv(my_buffer[4],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),17,comm_name,&status);
+	       MPI_Send(nb_buffer[4],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),16,comm_name);
+	       MPI_Recv(my_buffer[4],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),17,comm_name,&status);
 
 	         // top-right & bottom-left comm
-	       MPI_Send(nb_buffer[5],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),18,comm_name);
-	       MPI_Recv(my_buffer[5],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),19,comm_name,&status);
+	       MPI_Send(nb_buffer[5],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),18,comm_name);
+	       MPI_Recv(my_buffer[5],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),19,comm_name,&status);
 	}
 	else{
 		   // right & left comm
-	       MPI_Recv(my_buffer[4],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),16,comm_name,&status);
-	       MPI_Send(nb_buffer[4],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),17,comm_name);
+	       MPI_Recv(my_buffer[4],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),16,comm_name,&status);
+	       MPI_Send(nb_buffer[4],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),17,comm_name);
 
 	       // top-right & bottom-left comm
-	       MPI_Recv(my_buffer[5],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),18,comm_name,&status);
-	       MPI_Send(nb_buffer[5],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),19,comm_name);
+	       MPI_Recv(my_buffer[5],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),18,comm_name,&status);
+	       MPI_Send(nb_buffer[5],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),19,comm_name);
 
 	}
 
@@ -522,13 +524,13 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
 	if (y%2 == 0){
 	         // top & bottom comm
-	       MPI_Send(nb_buffer[6],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),20,comm_name);
-	       MPI_Recv(my_buffer[6],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),21,comm_name,&status);
+	       MPI_Send(nb_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),20,comm_name);
+	       MPI_Recv(my_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),21,comm_name,&status);
 	}
 	else{
 
-	       MPI_Recv(my_buffer[6],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),20,comm_name,&status);
-	       MPI_Send(nb_buffer[6],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),21,comm_name);
+	       MPI_Recv(my_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),20,comm_name,&status);
+	       MPI_Send(nb_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),21,comm_name);
 	}
 
 	// synchronize communication
@@ -580,7 +582,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
  		    nb_cpu_gcoord = calc_cpu_coord(cell_glob_coord) ;
 
  		    // CPU rank
- 		    loc_rank = get_cpu_neighbor(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z);
+ 		    loc_rank = get_cpu_rank(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z);
 
 
 		    // to get memory index of cell in cell list (!verify)
@@ -627,7 +629,6 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 
 		// my cpu coordinate
-		cpu_gcoord = get_cpu_gcoord(mc_prank);
 		int x = cpu_gcoord.x; int y = cpu_gcoord.y; int z = cpu_gcoord.z;
 
 		// randomly selected particle positions (my-my cpu and rec - neighbor cpu)
@@ -642,6 +643,9 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		// communication part -- send/request neighbors with chosen particle
 		//***************************************************************************
 
+		// synchronize communication
+		MPI_Barrier(comm_name);
+
 
 		// z direction communication
 		for (int ind=0;ind<4;ind++){
@@ -649,14 +653,14 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		     if (z%2==0){
 
 		       // front comm
-		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),0,comm_name);
-		       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),1,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),0,comm_name);
+		       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),1,comm_name,&status);
 
 		     }
 		     else{
 
-		       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),0,comm_name,&status);
-		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),1,comm_name);
+		       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),0,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),1,comm_name);
 
 		     }
 		}
@@ -666,21 +670,21 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		// x direction communication
 		if (x%2 == 0){
 		         // right & left comm
-		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),2,comm_name);
-		       MPI_Recv(rec_pos[4],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),3,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),2,comm_name);
+		       MPI_Recv(rec_pos[4],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),3,comm_name,&status);
 
 		         // top-right & bottom-left comm
-		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),4,comm_name);
-		       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),5,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),4,comm_name);
+		       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),5,comm_name,&status);
 		}
 		else{
 			   // right & left comm
-		       MPI_Recv(rec_pos[4],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),2,comm_name,&status);
-		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),3,comm_name);
+		       MPI_Recv(rec_pos[4],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),2,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),3,comm_name);
 
 		       // top-right & bottom-left comm
-		       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),4,comm_name,&status);
-		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),5,comm_name);
+		       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),4,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),5,comm_name);
 
 		}
 
@@ -688,13 +692,13 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 		if (y%2 == 0){
 		         // top & bottom comm
-		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),4,comm_name);
-		       MPI_Recv(rec_pos[6],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),5,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),4,comm_name);
+		       MPI_Recv(rec_pos[6],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),5,comm_name,&status);
 		}
 		else{
 
-		       MPI_Recv(rec_pos[6],3,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),4,comm_name,&status);
-		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),5,comm_name);
+		       MPI_Recv(rec_pos[6],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),4,comm_name,&status);
+		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),5,comm_name);
 		}
 
 
@@ -723,7 +727,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 		double* my_buffer [7],my_0,my_1,my_2,my_3,my_4,my_5,my_6; // to be received and filled in sphere cells
 
-		// allocate memory (to receive for neighbors)
+		// allocate memory (to receive from neighbors)
 		my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
 		my_3 = new double [buf_count]; my_4= new double [buf_count]; my_5 = new double [buf_count];
 		my_6 = new double [buf_count];
@@ -742,17 +746,17 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
         // boundary checks and flag assignments (ENSURE COORDINATES SHIFT IF REQUIRED)
 
-        // z check  with  N1
+        // z check  with  N1 (1st neighbor)
         if( (nb_gcoord[0][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[0][2] = -1;}
         if( (nb_gcoord[0][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[0][2] = +1;}
 
-        // x-z check with N2
+        // x-z check with N2 (2nd neighbor)
         if( (nb_gcoord[1][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[1][0] = -1;}
         if( (nb_gcoord[1][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[1][0] = +1;}
         if( (nb_gcoord[1][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[1][2] = -1;}
         if( (nb_gcoord[1][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[1][2] = +1;}
 
-        // x-y-z check with N4
+        // x-y-z check with N4 (3rd neighbor)
         if( (nb_gcoord[2][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[2][0] = -1;}
         if( (nb_gcoord[2][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[2][0] = +1;}
         if( (nb_gcoord[2][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[2][1] = -1;}
@@ -760,22 +764,23 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
         if( (nb_gcoord[2][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[2][2] = -1;}
         if( (nb_gcoord[2][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[2][2] = +1;}
 
-        // y-z check with N6
+        // y-z check with N6 (4th neighbor)
         if( (nb_gcoord[3][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[3][1] = -1;}
         if( (nb_gcoord[3][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[3][1] = +1;}
         if( (nb_gcoord[3][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[3][2] = -1;}
         if( (nb_gcoord[3][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[3][2] = +1;}
-        // x check with N3
+
+        // x check with N3  (5th neighbor)
         if( (nb_gcoord[4][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[4][0] = -1;}
         if( (nb_gcoord[4][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[4][0] = +1;}
 
-        // x-y check with N5
+        // x-y check with N5 (6th neighbor)
         if( (nb_gcoord[5][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[5][0] = -1;}
         if( (nb_gcoord[5][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[5][0] = +1;}
         if( (nb_gcoord[5][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[5][1] = -1;}
         if( (nb_gcoord[5][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[5][1] = +1;}
 
-        // y check with N7
+        // y check with N7 (7th neighbor)
         if( (nb_gcoord[6][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[6][1] = -1;}
         if( (nb_gcoord[6][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[6][1] = +1;}
 
@@ -792,6 +797,9 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
         // list of neighbor receive cells
         celltype neighb[19];
 
+        // total cells in cpu block
+        long ncells= bobj.get_ncells();
+
         // variables for neighbor cell ranges
         int nb_xmin, nb_ymin, nb_zmin, nb_xmax, nb_ymax, nb_zmax, nb_x, nb_y, nb_z;
 
@@ -800,6 +808,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    nb_ymin = zone_limit[win_id].ymin; nb_ymax = zone_limit[win_id].ymax;
 	    nb_zmin = zone_limit[win_id].zmin; nb_zmax = zone_limit[win_id].zmax;
 
+	    // Neighbor cells to be communicated as per sample window position
 	    if(nb_xmax ==1) {nb_x = 2;}
 	    else{ nb_x=0; }
 
@@ -811,37 +820,37 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
         // prepare NEIGHBOR cell list as per sample window id
 	    //Neighbor-1 (N1)
-	    nb_test[0].x =nb_xmin; nb_test[0].y = nb_ymin; nb_test[0].z = nb_z; neighb[0]=bobj.cell_with_lcoord(nb_test[0]);
-	    nb_test[1].x =nb_xmax; nb_test[1].y = nb_ymin; nb_test[1].z = nb_z; neighb[1]=bobj.cell_with_lcoord(nb_test[1]);
-	    nb_test[2].x =nb_xmin; nb_test[2].y = nb_ymax; nb_test[2].z = nb_z; neighb[2]=bobj.cell_with_lcoord(nb_test[2]);
-	    nb_test[3].x =nb_xmax; nb_test[3].y = nb_ymax; nb_test[3].z = nb_z; neighb[3]=bobj.cell_with_lcoord(nb_test[3]);
+	    nb_test[0].x =nb_xmin; nb_test[0].y = nb_ymin; nb_test[0].z = nb_z;    neighb[0] = bobj.cell_with_lcoord(nb_test[0],ncells);
+	    nb_test[1].x =nb_xmax; nb_test[1].y = nb_ymin; nb_test[1].z = nb_z;    neighb[1] = bobj.cell_with_lcoord(nb_test[1],ncells);
+	    nb_test[2].x =nb_xmin; nb_test[2].y = nb_ymax; nb_test[2].z = nb_z;    neighb[2] = bobj.cell_with_lcoord(nb_test[2],ncells);
+	    nb_test[3].x =nb_xmax; nb_test[3].y = nb_ymax; nb_test[3].z = nb_z;    neighb[3] = bobj.cell_with_lcoord(nb_test[3],ncells);
 
         //Neighbor-2 (N2)
-        nb_test[4].x = nb_x; nb_test[4].y = nb_ymin; nb_test[4].z = nb_z; neighb[4] = bobj.cell_with_lcoord(nb_test[4]);
-        nb_test[5].x = nb_x; nb_test[5].y = nb_ymax; nb_test[5].z = nb_z; neighb[5] = bobj.cell_with_lcoord(nb_test[5]);
+        nb_test[4].x = nb_x; nb_test[4].y = nb_ymin; nb_test[4].z = nb_z;      neighb[4] = bobj.cell_with_lcoord(nb_test[4],ncells);
+        nb_test[5].x = nb_x; nb_test[5].y = nb_ymax; nb_test[5].z = nb_z;      neighb[5] = bobj.cell_with_lcoord(nb_test[5],ncells);
 
         //Neighbor-3 (N4)
-        nb_test[6].x = nb_x; nb_test[6].y = nb_y; nb_test[6].z = nb_z;    neighb[6] = bobj.cell_with_lcoord(nb_test[6]);
+        nb_test[6].x = nb_x; nb_test[6].y = nb_y;    nb_test[6].z = nb_z;      neighb[6] = bobj.cell_with_lcoord(nb_test[6],ncells);
 
         //Neighbor-4 (N6)
-        nb_test[7].x = nb_xmin; nb_test[7].y = nb_y; nb_test[7].z = nb_z; neighb[7] = bobj.cell_with_lcoord(nb_test[7]);
-        nb_test[8].x = nb_xmax; nb_test[8].y = nb_y; nb_test[8].z = nb_z; neighb[8] = bobj.cell_with_lcoord(nb_test[8]);
+        nb_test[7].x = nb_xmin; nb_test[7].y = nb_y; nb_test[7].z = nb_z;      neighb[7] = bobj.cell_with_lcoord(nb_test[7],ncells);
+        nb_test[8].x = nb_xmax; nb_test[8].y = nb_y; nb_test[8].z = nb_z;      neighb[8] = bobj.cell_with_lcoord(nb_test[8],ncells);
 
         //Neighbor-5 (N3)
-	    nb_test[9].x =nb_x;   nb_test[9].y = nb_ymin; nb_test[9].z = nb_zmin;  neighb[9]=bobj.cell_with_lcoord(nb_test[9]);
-	    nb_test[10].x =nb_x; nb_test[10].y = nb_ymin; nb_test[10].z = nb_zmax; neighb[10]=bobj.cell_with_lcoord(nb_test[10]);
-	    nb_test[11].x =nb_x; nb_test[11].y = nb_ymax; nb_test[11].z = nb_zmin; neighb[11]=bobj.cell_with_lcoord(nb_test[11]);
-	    nb_test[12].x =nb_x; nb_test[12].y = nb_ymax; nb_test[12].z = nb_zmax; neighb[12]=bobj.cell_with_lcoord(nb_test[12]);
+	    nb_test[9].x =nb_x;   nb_test[9].y = nb_ymin; nb_test[9].z = nb_zmin;  neighb[9] = bobj.cell_with_lcoord(nb_test[9],ncells);
+	    nb_test[10].x =nb_x; nb_test[10].y = nb_ymin; nb_test[10].z = nb_zmax; neighb[10]= bobj.cell_with_lcoord(nb_test[10],ncells);
+	    nb_test[11].x =nb_x; nb_test[11].y = nb_ymax; nb_test[11].z = nb_zmin; neighb[11]= bobj.cell_with_lcoord(nb_test[11],ncells);
+	    nb_test[12].x =nb_x; nb_test[12].y = nb_ymax; nb_test[12].z = nb_zmax; neighb[12]= bobj.cell_with_lcoord(nb_test[12],ncells);
 
         //Neighbor-6 (N5)
-        nb_test[13].x = nb_x; nb_test[13].y = nb_y; nb_test[13].z = nb_zmin; neighb[13] = bobj.cell_with_lcoord(nb_test[13]);
-        nb_test[14].x = nb_x; nb_test[14].y = nb_y; nb_test[14].z = nb_zmax; neighb[14] = bobj.cell_with_lcoord(nb_test[14]);
+        nb_test[13].x = nb_x; nb_test[13].y = nb_y; nb_test[13].z = nb_zmin;   neighb[13] = bobj.cell_with_lcoord(nb_test[13],ncells);
+        nb_test[14].x = nb_x; nb_test[14].y = nb_y; nb_test[14].z = nb_zmax;   neighb[14] = bobj.cell_with_lcoord(nb_test[14],ncells);
 
 	    //Neighbor-7 (N7)
-	    nb_test[15].x =nb_xmin; nb_test[15].y = nb_y; nb_test[15].z = nb_zmin; neighb[15]=bobj.cell_with_lcoord(nb_test[15]);
-	    nb_test[16].x =nb_xmin; nb_test[16].y = nb_y; nb_test[16].z = nb_zmax; neighb[16]=bobj.cell_with_lcoord(nb_test[16]);
-	    nb_test[17].x =nb_xmax; nb_test[17].y = nb_y; nb_test[17].z = nb_zmin; neighb[17]=bobj.cell_with_lcoord(nb_test[17]);
-	    nb_test[18].x =nb_xmax; nb_test[18].y = nb_y; nb_test[18].z = nb_zmax; neighb[18]=bobj.cell_with_lcoord(nb_test[18]);
+	    nb_test[15].x =nb_xmin; nb_test[15].y = nb_y; nb_test[15].z = nb_zmin; neighb[15] = bobj.cell_with_lcoord(nb_test[15],ncells);
+	    nb_test[16].x =nb_xmin; nb_test[16].y = nb_y; nb_test[16].z = nb_zmax; neighb[16] = bobj.cell_with_lcoord(nb_test[16],ncells);
+	    nb_test[17].x =nb_xmax; nb_test[17].y = nb_y; nb_test[17].z = nb_zmin; neighb[17] = bobj.cell_with_lcoord(nb_test[17],ncells);
+	    nb_test[18].x =nb_xmax; nb_test[18].y = nb_y; nb_test[18].z = nb_zmax; neighb[18] = bobj.cell_with_lcoord(nb_test[18],ncells);
 
 	    //***********************************************************
 	    //                  My received neighbor part - fill buffers
@@ -853,7 +862,8 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 	    vec3d ref_pos, curr_pos;                       // reference/current particle position
 
-		double temp_id; double temp_type;            // temporary holder for particle attributes
+	    // temporary holder for particle attributes
+		double temp_id; double temp_type;
 		double temp_mass, temp_epot, dist_check;
 		vec3d temp_pos, temp_vel;
 
@@ -861,7 +871,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    int ind =0;                                   // neighbor cell counter
 	    long buf_counter,part_count;
 
-	    for(int j=0; j<7;j++ ){ // loop over all neighbor cells
+	    for(int j=0; j<7;j++ ){ // loop over all neighbor cpu
 
 	    	    buf_counter=1;
 
@@ -872,9 +882,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 	    	         part_count = neighb[ind].get_nparticles(); //get total particles
 
-
-
-	    	         for (long val;val<part_count;val++){ // loop over particles in each cell
+	    	         for (long val;val<part_count;val++){ // loop over particles in each neighbor cell
 
 		    		          curr_pos =neighb[ind].get_particle(val).get_myposition();
 
@@ -905,6 +913,10 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	                                           temp_vel  =  neighb[ind].get_particle(val).get_myvelocity();
 	                                           temp_epot =  neighb[ind].get_particle(val).get_myepot();
 
+	                                           // *************************************************
+	                                           // CRITICAL PART
+	                                           // *************************************************
+
 	                                           // ADD TO BUFFER nb_buffer
 	                                           *(nb_buffer+j+buf_counter++)  = temp_id;
 	                                           *(nb_buffer+j+buf_counter++)  = temp_type;
@@ -919,7 +931,6 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		    			                 }
 		    		                }
 		    		                else{ // include all particles inside mc_rsweep
-
 
 	 			        	            temp_id     = (double) (neighb[ind].get_particle(val).get_mynumber());
 	 			        	            temp_type   = (double) (neighb[ind].get_particle(val).get_mytype());
@@ -973,13 +984,13 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	        if (z%2==0){
 
 	          // front comm
-	          MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),7,comm_name);
-	          MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),6,comm_name,&status);
+	          MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),7,comm_name);
+	          MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),6,comm_name,&status);
 	        }
 	        else{
 
-	          MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),7,comm_name,&status);
-	          MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),6,comm_name);
+	          MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),7,comm_name,&status);
+	          MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),6,comm_name);
 	        }
 	    }
 
@@ -988,32 +999,32 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    // x direction communication
 	    if (x%2 == 0){
 	            // right & left comm
-	          MPI_Send(nb_buffer[4],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),9,comm_name);
-	          MPI_Recv(my_buffer[4],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),8,comm_name,&status);
+	          MPI_Send(nb_buffer[4],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),9,comm_name);
+	          MPI_Recv(my_buffer[4],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),8,comm_name,&status);
 
 	          // top-right & bottom-left comm
-	          MPI_Send(nb_buffer[5],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),11,comm_name);
-	          MPI_Recv(my_buffer[5],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),10,comm_name,&status);
+	          MPI_Send(nb_buffer[5],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),11,comm_name);
+	          MPI_Recv(my_buffer[5],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),10,comm_name,&status);
 	    }
 	    else{
 
-	          MPI_Recv(my_buffer[4],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),9,comm_name,&status);
-	          MPI_Send(nb_buffer[4],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),8,comm_name);
+	          MPI_Recv(my_buffer[4],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0]),9,comm_name,&status);
+	          MPI_Send(nb_buffer[4],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0]),8,comm_name);
 
 	          // top-right & bottom-left comm
-	          MPI_Recv(my_buffer[5],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),11,comm_name,&status);
-	          MPI_Send(nb_buffer[5],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),10,comm_name);
+	          MPI_Recv(my_buffer[5],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1]),11,comm_name,&status);
+	          MPI_Send(nb_buffer[5],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1]),10,comm_name);
 	    }
 
 	    // y direction communication
 	    if (y%2 == 0){
 	    	  // top & bottom comm
-	          MPI_Send(nb_buffer[6],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),13,comm_name);
-	          MPI_Recv(my_buffer[6],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),12,comm_name,&status);
+	          MPI_Send(nb_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),13,comm_name);
+	          MPI_Recv(my_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),12,comm_name,&status);
 	    }
 	    else{
-	          MPI_Recv(my_buffer[6],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),13,comm_name,&status);
-	          MPI_Send(nb_buffer[6],buf_count,MPI_DOUBLE,get_cpu_neighbor(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),12,comm_name);
+	          MPI_Recv(my_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),13,comm_name,&status);
+	          MPI_Send(nb_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),12,comm_name);
 	    }
 
 
@@ -1040,10 +1051,10 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    		for(int k=zone_limit[win_id].zmin;k<=zone_limit[win_id].zmax;k++){
 
 	    			test.x = i; test.y = j; test.z = k;
-	    			sample_cells[count] = bobj.cell_with_lcoord(test);
+	    			sample_cells[count] = bobj.cell_with_lcoord(test,ncells);
 
 	    			// add to sample factor
-	    			bobj.cell_with_lcoord(test).add_sample();
+	    			bobj.cell_with_lcoord(test,ncells).add_sample();
 
 	                count++;
 	    		}// k loop
@@ -1375,7 +1386,7 @@ void make_particles(cellblock loc_obj){
     	 // get cpu global coordinate from cell global coordinate
   		 nb_cpu_gcoord = calc_cpu_coord(cell_glob_coord) ;
 
-  		 loc_rank = get_cpu_neighbor(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z);
+  		 loc_rank = get_cpu_rank(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z);
 
 
  		 // get cpu glob position
@@ -1395,7 +1406,7 @@ void make_particles(cellblock loc_obj){
 
  		 }
 
-	     // clear STL container
+	     // clear STL container (once particle objects are created)
 
 	     mc_atomnumber.clear();
 	     mc_atomtypes.clear();
@@ -1434,13 +1445,16 @@ void fill_mc_container(cellblock loc_obj){
 
 			mc_epot.push_back(loc_obj.get_cell(i).get_particle(j).get_myepot());            // atom epot
 
+			// not required here -- declared in api using clear_all
 			// delete particle
-			loc_obj.get_cell(i).delete_particle(loc_obj.get_cell(i).get_particle(j),j);
+			//loc_obj.get_cell(i).delete_particle(loc_obj.get_cell(i).get_particle(j),j);
 
 		}// loop over particle
 
+		// not required here -- declared in api using clear_all
 		// delete cell
-		loc_obj.delete_cell(loc_obj.get_cell(i),i);
+		//loc_obj.delete_cell(loc_obj.get_cell(i),i);
+
 
 	}// loop over cells
 
@@ -1571,7 +1585,7 @@ void make_cells(cellblock loc_obj){
 	//  (could be hardcoded for Moving window approach as nxn )
 	stack_total   = calc_cpu_stack_total();
 	ncells_stack  = calc_ncells_stack(); // NOTE: verify requirement
-	ncells_cpu    = calc_ncells_cpu();
+	ncells_cpu    = loc_obj.get_ncells();
 	int row_total = calc_cpu_row_total();
 	int col_total = calc_cpu_col_total();
 
@@ -1582,7 +1596,7 @@ void make_cells(cellblock loc_obj){
     int cell_counter = 0;
 
     // process/cpu global position (in MPI cartesian topology system)
-    cpu_gcoord = get_cpu_gcoord(mc_prank);
+    //cpu_gcoord = get_cpu_gcoord(mc_prank);
 
     //*****************************************************************
     // create cell objects and fill into cell block container eventually
@@ -1766,73 +1780,69 @@ ivec3d cell_coordinate(double x, double y, double z){
   return coord;
 }
 
-void calc_cpu_block_limits(){
+//void calc_cpu_block_limits(){
+//
+//	// CHECK IF NECESSARY
+//	// NOTE : COULD BE REMOVED
+//    //*********************************************************
+//    // seemingly not important
+//	// compute CPU block limits in global dimension - called from rank 0
+//	//*********************************************************
+//
+//	int x_min_val=0,y_min_val=0,z_min_val=0;
+//	int x_max_val=mc_cpu_cell_dim.x,y_max_val=mc_cpu_cell_dim.y,z_max_val=mc_cpu_cell_dim.z;
+//
+//	for(auto i=0; i<stacks_block;i++){
+//
+//		for(auto j=0; j<rows_block; j++){
+//
+//			for(auto k=0; k<cols_block; k++){
+//
+//                  cellblock block_obj;
+//
+//                  block_obj.set_x_min(x_min_val);
+//                  block_obj.set_x_max(x_max_val-1);
+//
+//                  block_obj.set_y_min(y_min_val);
+//                  block_obj.set_y_max(y_max_val-1);
+//
+//                  block_obj.set_z_min(z_min_val);
+//                  block_obj.set_z_max(z_max_val-1);
+//
+//                  x_min_val = x_max_val*(k+1);
+//                  x_max_val += x_max_val ;
+//
+//			}// Column loop
+//
+//			x_min_val = 0;
+//			x_max_val = mc_cpu_cell_dim.x;
+//
+//			y_min_val =  y_max_val * (j+1);
+//			y_max_val += y_max_val;
+//
+//		}// Row loop
+//
+//		x_min_val = 0;
+//		x_max_val = mc_cpu_cell_dim.x;
+//
+//		y_min_val =  0;
+//		y_max_val =  mc_cpu_cell_dim.y;
+//
+//		z_min_val  =  z_max_val * (i+1);
+//		z_max_val +=  z_max_val;
+//
+//
+//	}// Stack loop
+//
+//
+//
+//} //calc_cpu_block_limits
 
-	// CHECK IF NECESSARY
-	// NOTE : COULD BE REMOVED
-    //*********************************************************
-    // seemingly not important
-	// compute CPU block limits in global dimension - called from rank 0
-	//*********************************************************
-
-	int x_min_val=0,y_min_val=0,z_min_val=0;
-	int x_max_val=mc_cpu_cell_dim.x,y_max_val=mc_cpu_cell_dim.y,z_max_val=mc_cpu_cell_dim.z;
-
-	for(auto i=0; i<stacks_block;i++){
-
-		for(auto j=0; j<rows_block; j++){
-
-			for(auto k=0; k<cols_block; k++){
-
-                  cellblock block_obj;
-
-                  block_obj.set_x_min(x_min_val);
-                  block_obj.set_x_max(x_max_val-1);
-
-                  block_obj.set_y_min(y_min_val);
-                  block_obj.set_y_max(y_max_val-1);
-
-                  block_obj.set_z_min(z_min_val);
-                  block_obj.set_z_max(z_max_val-1);
-
-                  x_min_val = x_max_val*(k+1);
-                  x_max_val += x_max_val ;
-
-			}// Column loop
-
-			x_min_val = 0;
-			x_max_val = mc_cpu_cell_dim.x;
-
-			y_min_val =  y_max_val * (j+1);
-			y_max_val += y_max_val;
-
-		}// Row loop
-
-		x_min_val = 0;
-		x_max_val = mc_cpu_cell_dim.x;
-
-		y_min_val =  0;
-		y_max_val =  mc_cpu_cell_dim.y;
-
-		z_min_val  =  z_max_val * (i+1);
-		z_max_val +=  z_max_val;
-
-
-	}// Stack loop
-
-
-
-} //calc_cpu_block_limits
-
-vec3d calc_cell_dim(double rsample){
-
+void calc_cell_dim(double rsample){
 	//    compute MonteCarlo cell dimension
-
 	mc_cell_dim.x = (mc_simbox_x.x) / (rsample);
 	mc_cell_dim.y = (mc_simbox_y.y) / (rsample);
 	mc_cell_dim.z = (mc_simbox_z.z) / (rsample);
-
-	return mc_cell_dim;
 }
 
 int calc_ncells_cpu(){
@@ -1878,22 +1888,6 @@ void calc_block_dim(){
 	cols_block   = mc_global_cell_dim.x / mc_cpu_cell_dim.x;
 	rows_block   = mc_global_cell_dim.y / mc_cpu_cell_dim.y;
 	stacks_block = mc_global_cell_dim.z / mc_cpu_cell_dim.z;
-}
-
-int get_cpu_rank(ivec3d cell_coord){
-
-	// NOT REQUIRED : (COMPUTE FROM MPI_Comm_rank())
-	// method to compute cpu_rank from global cell coordinates
-
-	ivec3d red_vec;
-	int proc_rank;
-
-	red_vec.x = cell_coord.x / mc_cpu_cell_dim.x;
-	red_vec.y = cell_coord.y / mc_cpu_cell_dim.y;
-	red_vec.z = cell_coord.z / mc_cpu_cell_dim.z;
-
-	proc_rank = (cols_block * rows_block * red_vec.z ) + (cols_block * red_vec.y) + (red_vec.x);
-	return proc_rank;
 }
 
 ivec3d calc_cpu_coord(ivec3d cell_coord){

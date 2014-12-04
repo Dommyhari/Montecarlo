@@ -10,16 +10,15 @@
 
 #include "Monte_classes.h"     // class declarations
 #include "Monte_globals.h"     // global variable definitions
-#include "Monte_prototypes.h"  // method declarations
+#include "Monte_prototypes.h"  // Internal method declarations
+#include "api.h"               // Interface method declarations
 
 using namespace std;
 
-
+// seems OK
 extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_types, int* md_restriction,double* md_simbox,
 		double md_temperature,double rsweep,double wall_thick,int sample_seed,MPI_Comm comm){
 
-    int ierror;
-    
     // getting cpu dimension
     mc_cpu_dim.x = *(md_cpu_dim);
     mc_cpu_dim.y = *(md_cpu_dim++);
@@ -32,18 +31,16 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
     mc_real_types = md_real_types;
 
     // mc simbox dimensions
-    mc_simbox_x.x = *(md_simbox);   mc_simbox_x.y = *(md_simbox++); mc_simbox_x.z = *(md_simbox++);
-    mc_simbox_y.x = *(md_simbox++); mc_simbox_y.y = *(md_simbox++); mc_simbox_y.z = *(md_simbox++);
-    mc_simbox_z.x = *(md_simbox++); mc_simbox_z.y = *(md_simbox++); mc_simbox_z.z = *(md_simbox++);
+    mc_simbox_x.x = *(md_simbox);   mc_simbox_x.y = 0.0;              mc_simbox_x.z = 0.0;
+    mc_simbox_y.x = 0.0;            mc_simbox_y.y = *(md_simbox++);   mc_simbox_y.z = 0.0;
+    mc_simbox_z.x = 0.0;            mc_simbox_z.y = 0.0;              mc_simbox_z.z = *(md_simbox++);
 
     // restriction vector for all element types
     int count=0;
     for(int i=0; i<mc_tot_types; i++){
-
     	mc_restriction[i].x = *(md_restriction+count); count++;
     	mc_restriction[i].y = *(md_restriction+count); count++;
     	mc_restriction[i].z = *(md_restriction+count); count++;
-
     }
 
     // MC simulation and sampling data
@@ -56,19 +53,20 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
     comm_name = comm;
 
     // no of process
-    ierror = MPI_Comm_size(comm_name, &mc_ncpus);
+    MPI_Comm_size(comm_name, &mc_ncpus);
     
     // process rank
-    ierror = MPI_Comm_rank(comm_name, &mc_prank);
+    MPI_Comm_rank(comm_name, &mc_prank);
     
     // prepare Montecarlo configuration
     setup_config();
 }
 
+// seems OK
 extern "C" void pack_config_to_montecarlo(long md_mc_tatoms_cpu,long *md_mc_atomnumber,int *md_mc_atomtypes,
 		double  *md_mc_atommass,double  *md_mc_positions, double *md_mc_epot){
 
-	    long rand_no,m=0; // random number variable
+	    long m=0; // index
 
 		mc_tatoms_cpu = md_mc_tatoms_cpu; // get total particles from MD
 
@@ -89,12 +87,11 @@ extern "C" void pack_config_to_montecarlo(long md_mc_tatoms_cpu,long *md_mc_atom
 		}
 
 		// check for unallocated vector
-		if(mc_atomnumber.empty()||mc_atomtypes.empty()||mc_atommass.empty()||mc_positions.empty()){
+		if(mc_atomnumber.empty()||mc_atomtypes.empty()||mc_atommass.empty()||mc_positions.empty()||mc_epot.empty()){
 			std::cerr<<"Montecarlo: problem allocating datas from MD "<<endl;
 		}
 		else if((mc_atomnumber.size()==mc_tatoms_cpu)&&(mc_atomtypes.size()==mc_tatoms_cpu)&&(mc_atommass.size()==mc_tatoms_cpu)
-				&&((mc_positions.size()/3)==mc_tatoms_cpu)){
-
+				&&((mc_positions.size()/3)==mc_tatoms_cpu) && (mc_epot.size()==mc_tatoms_cpu)){
 			std::cout<<" ------------------------------------------- "<<endl;
 			std::cout<<" Process id : "<<mc_prank<<endl;
 			std::cout<<" Total particles received : " <<mc_tatoms_cpu<<endl;
@@ -104,14 +101,15 @@ extern "C" void pack_config_to_montecarlo(long md_mc_tatoms_cpu,long *md_mc_atom
 		else {
 			std::cerr<<"Montecarlo: unknown error with allocation" <<endl;
 		}
-
-
 }
 
-extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumber,int **md_atomtypes,
-    		double **md_atommass,double **md_positions)
-{
+// NEED TESTING ( acceptance condition part)
 
+extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumber,int **md_atomtypes,
+    		double **md_atommass,double **md_positions){
+
+
+	int accept_flag = 0; // acceptance flag
 
 	// creating cellblock object
 	cellblock c_obj;
@@ -124,6 +122,11 @@ extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumb
 
     // create velocities (T != 0K)
     if(!mc_temp) create_maxwell_velocities(c_obj,mc_temp,mc_restriction);
+
+
+    //**************************************************************
+    //!!!!!!!!!!!!!!!!!!!!!!!!!! check if required
+    //**************************************************************
 
     // select random cell ex: cell-0 // for moving window cell after cell
     celltype cell_obj = c_obj.get_cell(0);
@@ -143,33 +146,55 @@ extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumb
     // if accept update
     //update_particle(cell_obj.get_cell_id(),sam_particle);
 
+    //*****************************************
+    //          some energy computation as per ensemble definitions (to initiate acceptance flag!!)
+    //*****************************************
+
+
+    // reading updated configuration after simulation
+    read_update_config (accept_flag,sample_id,file_name,sam_particle,c_obj);
+
     // fill mc container
     fill_mc_container(c_obj);
 
+    // clear created objects
+
+    for (long count=0; count < c_obj.get_ncells(); count++){
+        // clear all particles in cell
+    	c_obj.get_cell(count).clear_all_particles();
+    }
+    // clear all cells in cellblock
+    c_obj.clear_all_cells();
+
 	// Data mirroring procedure - Assigning pointers
 
-	md_pid        = &mc_prank;
-	md_tatoms_cpu = &mc_tatoms_cpu;
+	md_pid         = &mc_prank;              // process rank
+	md_tatoms_cpu  = &mc_tatoms_cpu;         // current total particles
 
 	// preliminary pointer assignment
-
-	*md_atomnumber = mc_atomnumber.data(); //error part
-    *md_atomtypes  = mc_atomtypes.data();
-	*md_atommass   = mc_atommass.data();  //they do have initialized pointers and memory
-    *md_positions  = mc_positions.data();
+	*md_atomnumber = mc_atomnumber.data();   // atom id
+    *md_atomtypes  = mc_atomtypes.data();    // atom types
+	*md_atommass   = mc_atommass.data();     // atom mass
+    *md_positions  = mc_positions.data();    // atom positions
 
 }
 
+// seems OK
 extern "C" void get_velocities(double **md_velocities){
     // based on velocity request flag
-    if(mc_get_velocity) *md_velocities = mc_velocities.data();
+
+	//if(mc_get_velocity) *md_velocities = mc_velocities.data();
+
+	*md_velocities = mc_velocities.data();
 }
 
+// seems OK
 extern "C" void get_pot_energy(double **md_epot){
     // get potential energy
     *md_epot       = mc_epot.data();
 }
 
+// seems OK
 extern "C" void clean_montecarlo(){
 	// clear or delete all data structures created in MC scope
 
@@ -189,9 +214,12 @@ extern "C" void clean_montecarlo(){
 	cout<<  " size : mc_atomtypes   " << mc_atomtypes.size()  << endl;
 	cout<<  " size : mc_atommass    " << mc_atommass.size()   << endl;
 	cout<<  " size : mc_positions   " << mc_positions.size()  << endl;
+	cout<<  " size : mc_positions   " << mc_velocities.size() << endl;
+	cout<<  " size : mc_epot        " << mc_epot.size()       << endl;
 	cout<<" ------------------------------------------- "<<endl;
 }
 
+// seems OK
 extern "C" void shut_down_montecarlo(){
 
     // reinitialize cpu dimension
@@ -222,6 +250,6 @@ extern "C" void shut_down_montecarlo(){
     mc_sphere_wall  =  0.0;        // sphere boundary thickness
     mc_sample_seed  =  0;          // seed for sampling random generator
 
-    // MOTE: look for further possibilities
+    // NOTE: look for further possibilities
 
 }

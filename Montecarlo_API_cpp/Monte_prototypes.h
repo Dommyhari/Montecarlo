@@ -14,8 +14,7 @@
 
 
 // utility methods definition
-
-int get_cpu_neighbor(int inde0,int inde1,int inde2);
+int get_cpu_rank(int inde0,int inde1,int inde2);
 
 void setup_config(void);
 
@@ -57,7 +56,7 @@ ivec3d cell_coordinate(double x, double y, double z);
 
 void calc_cpu_block_limits();
 
-vec3d calc_cell_dim(double rsample);
+void calc_cell_dim(double rsample);
 
 int calc_ncells_cpu(void);
 
@@ -70,8 +69,6 @@ int calc_cpu_row_total(void);
 int calc_cpu_stack_total(void);
 
 void calc_block_dim(void);
-
-int get_cpu_rank(ivec3d cell_coord);
 
 ivec3d calc_cpu_coord(ivec3d cell_coord);
 
@@ -86,7 +83,5 @@ vec3d vector_prod(vec3d u, vec3d v);
 ivec3d ivector_prod(ivec3d u, ivec3d v);
 
 double distance_vect(vec3d v1,vec3d v2);
-
-
 
 #endif /* MONTE_PROTOTYPES_H_ */

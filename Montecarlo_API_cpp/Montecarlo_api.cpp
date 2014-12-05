@@ -129,10 +129,10 @@ extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumb
     //**************************************************************
 
     // select random cell ex: cell-0 // for moving window cell after cell
-    celltype cell_obj = c_obj.get_cell(0);
+//    celltype cell_obj = c_obj.get_cell(0);
 
     // construct neighbor list for chosen cell
-    make_mc_nblist(cell_obj);
+//    make_mc_nblist(cell_obj);
 
     // sample window id
     int sample_id= 0;

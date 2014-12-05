@@ -199,7 +199,7 @@ particle sample_zone(cellblock bobj,int win_id){
 	return atom;
 }
 
-
+// seems OK
 void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cellblock bobj){
 
 	// NEED CHANGES
@@ -212,17 +212,14 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
     //----------------------------------------------//
 
 	const int LIMIT=1000;
-
 	// file buffers to store atom data's read from last configuration
-    vector<long>    fbuffer_id;
-    vector<int>     fbuffer_type;
-    vector<double> fbuffer_mass,fbuffer_epot;
-    vector<double> fbuffer_pos_x,fbuffer_pos_y,fbuffer_pos_z;
-    vector<double> fbuffer_vel_x,fbuffer_vel_y,fbuffer_vel_z;
-
+    vector<long>     fbuffer_id;
+    vector<int>      fbuffer_type;
+    vector<double>   fbuffer_mass,fbuffer_epot;
+    vector<double>   fbuffer_pos_x,fbuffer_pos_y,fbuffer_pos_z,fbuffer_vel_x,fbuffer_vel_y,fbuffer_vel_z;
 
     //******************************************************************************
-    //                           Flags
+    //                           Flags for communication
     //******************************************************************************
 
     // select neighbors as per sample window position
@@ -261,23 +258,23 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	int buf_count = buffer_size * 10; // buffer_size (to be allocated via suitable param file)
 
 	// N1 N2 N4 N6 N3 N5 N7
-	double* nb_buffer[7],nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6; // to be allocated and send
+	double* nb_buffer[7],nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6;   // to be allocated and send
 
 	// allocate memory (to send to neighbors)
 	nb_0 = new double [buf_count]; nb_1= new double [buf_count]; nb_2 = new double [buf_count];
 	nb_3 = new double [buf_count]; nb_4= new double [buf_count]; nb_5 = new double [buf_count];
 	nb_6 = new double [buf_count];
 
-	nb_buffer[7]={nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
+	nb_buffer = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
 
-	double* my_buffer [7],my_0,my_1,my_2,my_3,my_4,my_5,my_6; // to be received and filled in sphere cells
+	double* my_buffer[7],my_0,my_1,my_2,my_3,my_4,my_5,my_6;   // to be received and filled in sphere cells
 
 	// allocate memory (to receive for neighbors)
 	my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
 	my_3 = new double [buf_count]; my_4= new double [buf_count]; my_5 = new double [buf_count];
 	my_6 = new double [buf_count];
 
-	my_buffer={my_0,my_1,my_2,my_3,my_4,my_5,my_6};
+	my_buffer = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
 
     //********************************************************************************
 	// open and read file only if configuration get accepted
@@ -318,7 +315,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
                       // set back virtual particles to real particles on sphere boundary
                       fin>>f_type;
-                      if(f_type > mc_real_types){ f_type-=mc_real_types; }
+                      if(f_type > mc_real_types) { f_type-=mc_real_types; }
 
                       fbuffer_type.push_back(f_type);
                       fin>>f_mass;      fbuffer_mass.push_back(f_mass);
@@ -340,14 +337,13 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
             //           2- Updating and shifting part                        //
             //----------------------------------------------------------------//
 
-            // NOTE: later could be changed with n - particles in sphere count
-
             particle atom;
 
             long buf_ind, total_particles=0;
             cout<< "Updating particle attributes " << endl;
 
-    		double temp_id; double temp_type;            // temporary holder for particle attributes
+            // temporary holder for particle attributes
+    		double temp_id; double temp_type;
     		double temp_mass, temp_epot, dist_check;
     		double temp_vel_x,temp_vel_y,temp_vel_z;
 
@@ -367,7 +363,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
             	    buf_ind = 1;                      // initialize for each buffer step
             	    // attributes assignments
             	    temp_id     = (double) fbuffer_id.at(i);
-                    temp_type   = (double) fbuffer_type.at(i);
+                    temp_type   = (double) fbuffer_type.at(i);       // type conversion for buffer type consistency
             	    temp_mass   = fbuffer_mass.at(i);
             	    // position assignments
             	    temp_pos_x  = fbuffer_pos_x.at(i);
@@ -381,12 +377,12 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
             	    temp_epot   = fbuffer_epot.at(i);
 
              	    // global boundary check and position update to actual box dimensions
-             	    if (fbuffer_pos_x.at(i) < 0.0)               temp_pos_x = temp_pos_x + mc_simbox_x.x ;
-             	    if (fbuffer_pos_x.at(i) > mc_simbox_x.x)     temp_pos_x = temp_pos_x - mc_simbox_x.x ;
-             	    if (fbuffer_pos_y.at(i) < 0.0)               temp_pos_y = temp_pos_y + mc_simbox_y.y ;
-             	    if (fbuffer_pos_y.at(i) > mc_simbox_y.y)     temp_pos_y = temp_pos_y - mc_simbox_y.y ;
-             	    if (fbuffer_pos_z.at(i) < 0.0)               temp_pos_z = temp_pos_z + mc_simbox_z.z ;
-             	    if (fbuffer_pos_z.at(i) > mc_simbox_z.z)     temp_pos_z = temp_pos_z - mc_simbox_z.z ;
+             	    if (fbuffer_pos_x.at(i) < 0.0)               temp_pos_x += mc_simbox_x.x ;
+             	    if (fbuffer_pos_x.at(i) > mc_simbox_x.x)     temp_pos_x -= mc_simbox_x.x ;
+             	    if (fbuffer_pos_y.at(i) < 0.0)               temp_pos_y += mc_simbox_y.y ;
+             	    if (fbuffer_pos_y.at(i) > mc_simbox_y.y)     temp_pos_y -= mc_simbox_y.y ;
+             	    if (fbuffer_pos_z.at(i) < 0.0)               temp_pos_z += mc_simbox_z.z ;
+             	    if (fbuffer_pos_z.at(i) > mc_simbox_z.z)     temp_pos_z -= mc_simbox_z.z ;
 
              	    // global cell coordinate from particle position
              	    cell_glob_coord = cell_coordinate(temp_pos_x, temp_pos_y, temp_pos_z);
@@ -422,6 +418,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
                         *(nb_buffer+target+buf_ind++)  = temp_vel_z;
                         *(nb_buffer+target+buf_ind++)  = temp_epot;
 
+                        // updating buffer size for every particle belongs to it
                         buff_size[target] = buf_ind-1; // check it!!
          		    }
 
@@ -436,7 +433,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
          		        // to get memory index of cell in cell list (!verify)
          		        cell_index = cell_loc_coord.x + (cell_loc_coord.y * mc_cpu_cell_dim.x) + (cell_loc_coord.z * mc_cpu_cell_dim.y * mc_cpu_cell_dim.x);
 
-         		        particle_id = fbuffer_id.at(i);
+         		        //particle_id = fbuffer_id.at(i);
 
          		        // defining particle attributes
          		        atom.set_mynumber(fbuffer_id.at(i));
@@ -456,7 +453,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
             // assign buffer size to each neighbor CPU
 
-            for (int r_count=0; r_count<7;){
+            for (int r_count=0; r_count<7; r_count++){
     	      total_particles       = buff_size[r_count] * 0.1 ;  // 10 attributes for each particle
               *(nb_buffer+r_count)  = (double) total_particles;  // each buffer first location has particles count
             }
@@ -475,8 +472,10 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	//                 send / receive part
 	//****************************************************************
 
+	// synchronize communication
+	MPI_Barrier(comm_name);
+
 	// my cpu coordinate
-	//cpu_gcoord = get_cpu_gcoord(mc_prank);
 	int x = cpu_gcoord.x; int y = cpu_gcoord.y; int z = cpu_gcoord.z;
 
 	// z direction communication
@@ -484,6 +483,8 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
 	     if (z%2==0){
 
+	       // NOTE: I send to all CPU's from whom I requested sphere portions
+	       //	    I receive from all CPU's to which I send requested sphere portions
 	       // front comm
 	       MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),14,comm_name);
 	       MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),15,comm_name,&status);
@@ -541,38 +542,41 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	//                if I receive updated configuration - effect changes
 	//***********************************************************************
 
+	// temporary holder for particle attributes
 	long mybuf_ind,rec_particles=0;
-	double temp_id; double temp_type;            // temporary holder for particle attributes
+	double temp_id; double temp_type;
 	double temp_mass, temp_epot, dist_check;
 	double temp_vel_x,temp_vel_y,temp_vel_z;
 
     // temporary position place-holders
     double temp_pos_x,temp_pos_y,temp_pos_z;
-    ivec3d cpu_fact,cell_glob_coord,cell_loc_coord, nb_cpu_gcoord;
-    int loc_rank,cell_index;
+
+    ivec3d cpu_fact, cell_glob_coord, cell_loc_coord, nb_cpu_gcoord;
+    int loc_rank, cell_index;
 
     particle atom;
 
-	// loop over my_received buffers and add particles to sphere cell
+	// loop over my_received buffers and update particles if necessary
 	for(int n_count=0;n_count<7;n_count++){
 
 		rec_particles = (long) *(my_buffer+n_count);
 		mybuf_ind =1;
 
+		// check for empty buffer
         if(rec_particles !=0 ){
 
-            atom.set_mynumber((long) *(my_buffer+mybuf_ind++));
-            atom.set_mytype((int) *(my_buffer+mybuf_ind++));
-            atom.set_mymass((double) *(my_buffer+mybuf_ind++));
+            atom.set_mynumber((long) *(my_buffer+n_count+mybuf_ind++));
+            atom.set_mytype((int) *(my_buffer+n_count+mybuf_ind++));
+            atom.set_mymass((double) *(my_buffer+n_count+mybuf_ind++));
 
-            // shifting origin of coordinate system
-            temp_pos_x = (double) *(my_buffer+mybuf_ind++);
-            temp_pos_y = (double) *(my_buffer+mybuf_ind++);
-            temp_pos_z = (double) *(my_buffer+mybuf_ind++);
+//            // shifting origin of coordinate system
+//            temp_pos_x = (double) *(my_buffer+n_count+mybuf_ind++);
+//            temp_pos_y = (double) *(my_buffer+n_count+mybuf_ind++);
+//            temp_pos_z = (double) *(my_buffer+n_count+mybuf_ind++);
 
-            atom.set_myposition((double) *(my_buffer+mybuf_ind++),(double) *(my_buffer+mybuf_ind++),(double) *(my_buffer+mybuf_ind++));
-            atom.set_myvelocity((double) *(my_buffer+mybuf_ind++),(double) *(my_buffer+mybuf_ind++),(double) *(my_buffer+mybuf_ind++));
-            atom.set_myepot((double) *(my_buffer+mybuf_ind++));
+            atom.set_myposition((double) *(my_buffer+n_count+mybuf_ind++),(double) *(my_buffer+n_count+mybuf_ind++),(double) *(my_buffer+n_count+mybuf_ind++));
+            atom.set_myvelocity((double) *(my_buffer+n_count+mybuf_ind++),(double) *(my_buffer+n_count+mybuf_ind++),(double) *(my_buffer+n_count+mybuf_ind++));
+            atom.set_myepot((double) *(my_buffer+n_count+mybuf_ind++));
 
 
         	// global cell coordinate from particle position
@@ -607,8 +611,23 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
     delete[] my_4;delete[] my_5;delete[] my_6;
 
 
+    // clear all file buffers
+
+    fbuffer_id.clear();
+    fbuffer_type.clear();
+    fbuffer_mass.clear();
+    fbuffer_epot.clear();
+    fbuffer_pos_x.clear();
+    fbuffer_pos_y.clear();
+    fbuffer_pos_z.clear();
+    fbuffer_vel_x.clear();
+    fbuffer_vel_y.clear();
+    fbuffer_vel_z.clear();
+
+
 }
 
+// seems OK
 void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 
@@ -631,10 +650,10 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		// my cpu coordinate
 		int x = cpu_gcoord.x; int y = cpu_gcoord.y; int z = cpu_gcoord.z;
 
-		// randomly selected particle positions (my-my cpu and rec - neighbor cpu)
-		double my_pos[3], rec_pos_0[3],rec_pos_1[3],rec_pos_2[3],rec_pos_3[3],rec_pos_4[3],rec_pos_5[3],rec_pos_6[3],rec_pos_7[3];
+		// randomly selected particle positions (my cpu and rec_neighbor cpu)
+		double my_pos[3], rec_pos_0[3],rec_pos_1[3],rec_pos_2[3],rec_pos_3[3],rec_pos_4[3],rec_pos_5[3],rec_pos_6[3];
 
-		double* rec_pos[8]={rec_pos_0,rec_pos_1,rec_pos_2,rec_pos_3,rec_pos_4,rec_pos_5,rec_pos_6,rec_pos_7};
+		double* rec_pos[7]={rec_pos_0,rec_pos_1,rec_pos_2,rec_pos_3,rec_pos_4,rec_pos_5,rec_pos_6};
 
 		my_pos[0]=pobj.get_myposition().x; my_pos[1]=pobj.get_myposition().y; my_pos[2]=pobj.get_myposition().z;
 
@@ -705,9 +724,9 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		// synchronize communication
 		MPI_Barrier(comm_name);
 
-		// do sweep test to construct buffers
 
-
+		//*******************************************************************
+		//                do sweep test to construct buffers
 	    //******************************************************************
 	    // NOTE: HARDCODED FOR 8 CELLS IN A SAMPLER WINDOW (OWN CPU)
         // NEED TO BE GENERALIZED LATER DURING BIAS APPROACH
@@ -725,7 +744,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 		nb_buffer[7]={nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
 
-		double* my_buffer [7],my_0,my_1,my_2,my_3,my_4,my_5,my_6; // to be received and filled in sphere cells
+		double* my_buffer[7],my_0,my_1,my_2,my_3,my_4,my_5,my_6; // to be received and filled in sphere cells
 
 		// allocate memory (to receive from neighbors)
 		my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
@@ -737,7 +756,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		// neighbor cpu global coordinate
 		double nb_gcoord [7][3]; // [neighbor] [gcoord_x gcoord_y gcoord_z]
 
-		// flags for coordinate shifting
+		// flags for coordinate shifting (if they are on edges!!)
         int flag [7][3]; // [neighbor] [x y z]
 
         // global cpu array dimension range
@@ -787,10 +806,10 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		// local cell coordinates zone
 	    ivec3d test, nb_test[19];
 
-	    // window sampling cells
+	    // window sampling cells (my own cells)
 	    celltype sample_cells[8];
 
-	    //window neighbor cells
+	    //window neighbor cells (to be sent)
         // no of each neighbor cells ( N1 N2 N4 N6 N3 N5 N7 )
         int neig_cells_size [7]={4,2,1,2,4,2,4};
 
@@ -872,38 +891,29 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    long buf_counter,part_count;
 
 	    for(int j=0; j<7;j++ ){ // loop over all neighbor cpu
-
 	    	    buf_counter=1;
-
-	    	    // get receive neighbor chosen particle positions
+	    	    // get received neighbor chosen particle positions
 	    	    ref_pos.x = *rec_pos(j+0); ref_pos.y = *rec_pos(j+1); ref_pos.z = *rec_pos(j+2);
 
 	    	    for (int k=0; k<neig_cells_size[j]; k++){ // loop over each neighbor sub total
-
 	    	         part_count = neighb[ind].get_nparticles(); //get total particles
 
-	    	         for (long val;val<part_count;val++){ // loop over particles in each neighbor cell
-
+	    	         for (long val=0;val<part_count;val++){ // loop over particles in each neighbor cell
 		    		          curr_pos =neighb[ind].get_particle(val).get_myposition();
-
-		    		          // coordinate shifting as per flag initialization
+		    		          // coordinate shifting as per flag initialization(for cells on edges of CPU)
 		    		          curr_pos.x = curr_pos.x + (flag[j][0] * mc_simbox_x.x);
 		    		          curr_pos.y = curr_pos.y + (flag[j][1] * mc_simbox_y.y);
 		    		          curr_pos.z = curr_pos.z + (flag[j][2] * mc_simbox_z.z);
 
 		    		          dist_check = distance_vect(ref_pos,curr_pos);
 		    		          // ----- cutoff check
-		    		          //
 		    		          if(dist_check <= r_full ){
-
      		    		            // declare virtual particles on sphere boundary
 	     	    		            if( dist_check > r_sphere ){
-
 	     	    			             temp_type = (double) neighb[ind].get_particle(val).get_mytype();
 
 	     	    			             // ignore placeholders on sphere wall
 		    			                 if (temp_type != (double) 2 ) { // HC: now hardcoded for placeholders
-
 		    			        	           temp_id     = (double) (neighb[ind].get_particle(val).get_mynumber());
 		    			        	           temp_type   = (double) (temp_type + mc_real_types);  // HC: hardcoded for ntypes=3
 	                                           temp_mass   =  neighb[ind].get_particle(val).get_mymass();
@@ -955,10 +965,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		             	            }
 
 		                      }  // cut-off check
-
-
 		    	     } //  end of particles loop
-
 		    	     ind++; // neighbor cells counter
 
 	    	    } // loop over each neighbor sub total
@@ -968,21 +975,21 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 		} // end of Neighbor cpu loop
 
+
+
 	    //****************************************************************
 	    //          send/receive buffers to/from corresponding neighbors
 	    //****************************************************************
-
 
 		// synchronize communication
 		MPI_Barrier(comm_name);
 
 
 	    // z direction
-
 	    for (int ind=0;ind<4;ind++){
-
 	        if (z%2==0){
-
+	          // SWAP ORDER: receive from neighbors to whom I requested
+	          //           : send to neighbors from whom I received request
 	          // front comm
 	          MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),7,comm_name);
 	          MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),6,comm_name,&status);
@@ -992,7 +999,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	          MPI_Recv(my_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),7,comm_name,&status);
 	          MPI_Send(nb_buffer[ind],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),6,comm_name);
 	        }
-	    }
+	    } // loop  over neighbors (N1 N2 N4 N6)
 
 	    // Next phase even-even or odd-odd communications
 
@@ -1026,20 +1033,14 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	          MPI_Recv(my_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2]),13,comm_name,&status);
 	          MPI_Send(nb_buffer[6],buf_count,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2]),12,comm_name);
 	    }
-
-
 		// synchronize communication
 		MPI_Barrier(comm_name);
 
-
-
 	    // **************************************************************************
 	    // allocate received buffers if any
-	    // analyse received buffers and fill into sphere cells if necessary
+	    // analyze received buffers and fill into sphere cells if necessary
 	    // **************************************************************************
-
-
-        celltype sphere_cell;    // contains particles in spherical domain for simulation
+        celltype sphere_cell;    // contains particles in spherical domain for LOCAL MD simulation
         particle atom,my_atom;   // particle object
 
 	    int count=0;
@@ -1049,13 +1050,10 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    for(int i=zone_limit[win_id].xmin;i<=zone_limit[win_id].xmax;i++){
 	    	for(int j=zone_limit[win_id].ymin;j<=zone_limit[win_id].ymax;j++){
 	    		for(int k=zone_limit[win_id].zmin;k<=zone_limit[win_id].zmax;k++){
-
 	    			test.x = i; test.y = j; test.z = k;
 	    			sample_cells[count] = bobj.cell_with_lcoord(test,ncells);
-
 	    			// add to sample factor
 	    			bobj.cell_with_lcoord(test,ncells).add_sample();
-
 	                count++;
 	    		}// k loop
 	    	}// j loop
@@ -1064,7 +1062,6 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 	    // Reference particle position
 	    vec3d ref_position = pobj.get_myposition(); // my own selected particle
-
 	    vec3d my_curr; // my current position
 
 	    // loop over my sample zone and add to sphere cells with in sweep
@@ -1076,7 +1073,6 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    //*************************************************************
 	    //                   My neighbor part -fill sphere cells
 	    //*************************************************************
-
 
 	    // loop over my_received buffers and add particles to sphere cell
         // shift to origin
@@ -1115,11 +1111,9 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    //                   My particle part -fill sphere cells
 	    //*************************************************************
 
-
 	    // loop over sample_cells -- perform distance check and add particles to sphere_cell
 	    // shift to origin
         int my_temp_type;
-
 
         for(int j=0; j<8; j++){ // loop over sample cells
 
@@ -1167,9 +1161,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
    		            }
 		        } // end of cut-off check
 
-
         	} // loop over particles
-
         } // loop over sample cells
 
         // adding randomly chosen particle of own cpu
@@ -1199,7 +1191,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
         // opening file stream object
         ofstream fout(filename, ios_base::out);
 
-        cout<<" Sphere constructor writing to file : " << filename<<endl;
+        cout<<" Sphere constructor writing to file : " << filename << endl;
 
         //********** loop over revised sphere cell list - 2 **************
         long fp_total = sphere_cell.get_nparticles();
@@ -1239,12 +1231,13 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 }
 
+// check if really required
 void make_mc_nblist(celltype cobj){
 
 	//: DNOTE: later additional signature to identify zone and nbl will be constructed accordingly
 
 	 // create neighbor list for the given cell
-	 ivec3d g_max = mc_global_cell_dim;    // global cell array dimension - Max
+	 ivec3d g_max = {mc_global_cell_dim.x-1,mc_global_cell_dim.y-1,mc_global_cell_dim.z-1};    // global cell array dimension - Max
 	 ivec3d g_min = {0,0,0};               // global cell array dimension - Min
 
      //**************************************
@@ -1264,10 +1257,10 @@ void make_mc_nblist(celltype cobj){
 	 int z_dir[3] = {0,-1,+1};
 
 	 y_minus = --ref.y; if(ref.y == g_min.y) { y_minus = g_max.y;}
-	 y_plus  = ++ref.y; if(ref.y == g_max.y) { y_plus = g_min.y;}
+	 y_plus  = ++ref.y; if(ref.y == g_max.y) { y_plus  = g_min.y;}
 
 	 x_minus = --ref.x; if(ref.x == g_min.x) { x_minus = g_max.x;}
-	 x_plus  = ++ref.x; if(ref.x == g_max.x) { x_plus = g_min.x;}
+	 x_plus  = ++ref.x; if(ref.x == g_max.x) { x_plus  = g_min.x;}
 
 	 // loop over three possible z-directions
 	 for (int i=0; i<3; i++){
@@ -1289,13 +1282,15 @@ void make_mc_nblist(celltype cobj){
 
 }
 
+// seems OK
 ivec3d get_cpu_gcoord(int myrank){
 
 	// NEED CHANGES (can be computed from MPI Virtual topology)
 
 	// compute cpu global coordinate based on process rank
+//	ivec3d cpu_array[mc_ncpus], my_coord;  // CHECK: have to be initialized via corresponding method
 
-	ivec3d cpu_array[mc_ncpus], my_coord;  // CHECK: have to be initialized via corresponding method
+	ivec3d my_coord;
 	int grid_coord[3];
 
 	MPI_Cart_coords(comm_name,myrank,3,grid_coord);
@@ -1307,6 +1302,7 @@ ivec3d get_cpu_gcoord(int myrank){
 	return my_coord;
 }
 
+// seems OK
 ivec3d get_cell_loc_coord(ivec3d glob_coord, ivec3d cpu_glob_pos){
 
 	// compute cell local coordinates from cell global coordinate and cpu glob position
@@ -1320,24 +1316,18 @@ ivec3d get_cell_loc_coord(ivec3d glob_coord, ivec3d cpu_glob_pos){
 	return cell_loc_coord;
 }
 
+
+// seems OK
 void make_particles(cellblock loc_obj){
 
 	 // DO CHECKING
-
      // method for creating particle objects and fill in cell container
-
-
 	 std::cout<<" make particles for process : "<< mc_prank << endl;
 	 std::cout<<" total particle objects created : "<< mc_tatoms_cpu <<endl;
 
 	 //*************************************************
 	 // NOTE:before make_particles():--  cell_block()--> make_cells()--> with cell id and glob coord
-
-	 //cellblock loc_obj;
-
 	 //*************************************************
-
-//	 particle* atom;
 
 	 long m=0;
 	 ivec3d cell_glob_coord,nb_cpu_gcoord;
@@ -1354,8 +1344,8 @@ void make_particles(cellblock loc_obj){
 //		 atom->set_mymass(mc_atommass.at(i));
 //		 atom->set_myposition(mc_positions.at(m++),mc_positions.at(m++),mc_positions.at(m++));
 
-		 // assigning attributes - old implementation
 
+		 // assigning attributes - old implementation
 		 atom.set_mynumber(mc_atomnumber.at(i));
  		 atom.set_mytype(mc_atomtypes.at(i));
 
@@ -1371,16 +1361,7 @@ void make_particles(cellblock loc_obj){
  		 atom.set_myposition(mc_positions.at(m++),mc_positions.at(m++),mc_positions.at(m++));
  		 atom.set_myepot(mc_epot.at(i));
 
- 		 //**************************************************
- 		 // NOTE: generate velocity
- 		 //**************************************************
- 		 // by now should have constructed cell with boundary
-
- 		 // also method to return cell_id from particle position
-
-
  		 // get global cell coordinate from particle position
-
    		 cell_glob_coord = cell_coordinate(atom.get_myposition().x, atom.get_myposition().y, atom.get_myposition().z);
 
     	 // get cpu global coordinate from cell global coordinate
@@ -1388,13 +1369,10 @@ void make_particles(cellblock loc_obj){
 
   		 loc_rank = get_cpu_rank(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z);
 
-
  		 // get cpu glob position
-
  		 ivec3d cpu_fact = get_cpu_gcoord(loc_rank);
 
  		 // get cell local coordinate
-
  		 ivec3d cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact);
 
  		 // to get memory index of cell in cell list
@@ -1407,7 +1385,6 @@ void make_particles(cellblock loc_obj){
  		 }
 
 	     // clear STL container (once particle objects are created)
-
 	     mc_atomnumber.clear();
 	     mc_atomtypes.clear();
          mc_atommass.clear();

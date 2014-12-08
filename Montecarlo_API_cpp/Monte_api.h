@@ -8,7 +8,6 @@
 #ifndef MONTE_API_H_
 #define MONTE_API_H_
 
-#include < mpi.h >
 
 /*  function prototypes */
 

@@ -11,7 +11,7 @@
 #include "Monte_classes.h"     // class declarations
 #include "Monte_globals.h"     // global variable definitions
 #include "Monte_prototypes.h"  // Internal method declarations
-#include "api.h"               // Interface method declarations
+#include "Monte_api.h"               // Interface method declarations
 
 using namespace std;
 
@@ -49,6 +49,7 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
     mc_sphere_wall  =  wall_thick;          // sphere boundary thickness
     mc_sample_seed  =  sample_seed;         // seed for sampling random generator
 
+
     // assign communicator
     comm_name = comm;
 
@@ -69,6 +70,9 @@ extern "C" void pack_config_to_montecarlo(long md_mc_tatoms_cpu,long *md_mc_atom
 	    long m=0; // index
 
 		mc_tatoms_cpu = md_mc_tatoms_cpu; // get total particles from MD
+
+	    // allocate buffer size
+	    buffer_size = mc_tatoms_cpu; // total no of particles + threshold value
 
 		for(long i=0; i<mc_tatoms_cpu; i++){
 

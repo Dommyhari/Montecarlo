@@ -63,7 +63,7 @@ class celltype{
 	long nparticles;          // total no of particles
 	ivec3d gcoord;            // cell global coordinates
 	ivec3d lcoord;            // cell local  coordinates
-    int sample_fact=0;        // sample factor (how frequent a cell is sampled)
+    int sample_fact;         // sample factor (how frequent a cell is sampled)
 
 	vector<particle> cell;    // cell list contain particles belong to it
 	ivec3d nbl_list[27];      // hard-coded for 27 neighbors

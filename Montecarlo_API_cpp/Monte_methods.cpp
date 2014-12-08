@@ -258,23 +258,23 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	int buf_count = buffer_size * 10; // buffer_size (to be allocated via suitable param file)
 
 	// N1 N2 N4 N6 N3 N5 N7
-	double* nb_buffer[7],nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6;   // to be allocated and send
+    double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6;   // to be allocated and send
 
 	// allocate memory (to send to neighbors)
 	nb_0 = new double [buf_count]; nb_1= new double [buf_count]; nb_2 = new double [buf_count];
 	nb_3 = new double [buf_count]; nb_4= new double [buf_count]; nb_5 = new double [buf_count];
 	nb_6 = new double [buf_count];
 
-	nb_buffer = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
+	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
 
-	double* my_buffer[7],my_0,my_1,my_2,my_3,my_4,my_5,my_6;   // to be received and filled in sphere cells
+	double *my_0, *my_1, *my_2, *my_3, *my_4, *my_5, *my_6;   // to be received and filled in sphere cells
 
 	// allocate memory (to receive for neighbors)
 	my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
 	my_3 = new double [buf_count]; my_4= new double [buf_count]; my_5 = new double [buf_count];
 	my_6 = new double [buf_count];
 
-	my_buffer = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
+	double* my_buffer[7] = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
 
     //********************************************************************************
 	// open and read file only if configuration get accepted
@@ -407,16 +407,16 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
          			    buf_ind += buff_size[target];
 
                         // ADD TO BUFFER nb_buffer
-                        *(nb_buffer+target+buf_ind++)  = temp_id;
-                        *(nb_buffer+target+buf_ind++)  = temp_type;
-                        *(nb_buffer+target+buf_ind++)  = temp_mass;
-                        *(nb_buffer+target+buf_ind++)  = temp_pos_x;
-                        *(nb_buffer+target+buf_ind++)  = temp_pos_y;
-                        *(nb_buffer+target+buf_ind++)  = temp_pos_z;
-                        *(nb_buffer+target+buf_ind++)  = temp_vel_x;
-                        *(nb_buffer+target+buf_ind++)  = temp_vel_y;
-                        *(nb_buffer+target+buf_ind++)  = temp_vel_z;
-                        *(nb_buffer+target+buf_ind++)  = temp_epot;
+                        *(nb_buffer[target]+buf_ind++)  = temp_id;
+                        *(nb_buffer[target]+buf_ind++)  = temp_type;
+                        *(nb_buffer[target]+buf_ind++)  = temp_mass;
+                        *(nb_buffer[target]+buf_ind++)  = temp_pos_x;
+                        *(nb_buffer[target]+buf_ind++)  = temp_pos_y;
+                        *(nb_buffer[target]+buf_ind++)  = temp_pos_z;
+                        *(nb_buffer[target]+buf_ind++)  = temp_vel_x;
+                        *(nb_buffer[target]+buf_ind++)  = temp_vel_y;
+                        *(nb_buffer[target]+buf_ind++)  = temp_vel_z;
+                        *(nb_buffer[target]+buf_ind++)  = temp_epot;
 
                         // updating buffer size for every particle belongs to it
                         buff_size[target] = buf_ind-1; // check it!!
@@ -455,7 +455,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
             for (int r_count=0; r_count<7; r_count++){
     	      total_particles       = buff_size[r_count] * 0.1 ;  // 10 attributes for each particle
-              *(nb_buffer+r_count)  = (double) total_particles;  // each buffer first location has particles count
+              *(nb_buffer[r_count])  = (double) total_particles;  // each buffer first location has particles count
             }
 
 	} // acceptance condition
@@ -463,7 +463,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	else{ // rejected condition
 
 		for(int j=0; j<7; j++){
-			*(nb_buffer+j) = 0.0; // assign all neighbor buffer size to 0
+			*(nb_buffer[j]) = 0.0; // assign all neighbor buffer size to 0
 		}
 	}
 
@@ -565,18 +565,18 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 		// check for empty buffer
         if(rec_particles !=0 ){
 
-            atom.set_mynumber((long) *(my_buffer+n_count+mybuf_ind++));
-            atom.set_mytype((int) *(my_buffer+n_count+mybuf_ind++));
-            atom.set_mymass((double) *(my_buffer+n_count+mybuf_ind++));
+            atom.set_mynumber((long) *(my_buffer[n_count]+mybuf_ind++));
+            atom.set_mytype((int) *(my_buffer[n_count]+mybuf_ind++));
+            atom.set_mymass((double) *(my_buffer[n_count]+mybuf_ind++));
 
 //            // shifting origin of coordinate system
 //            temp_pos_x = (double) *(my_buffer+n_count+mybuf_ind++);
 //            temp_pos_y = (double) *(my_buffer+n_count+mybuf_ind++);
 //            temp_pos_z = (double) *(my_buffer+n_count+mybuf_ind++);
 
-            atom.set_myposition((double) *(my_buffer+n_count+mybuf_ind++),(double) *(my_buffer+n_count+mybuf_ind++),(double) *(my_buffer+n_count+mybuf_ind++));
-            atom.set_myvelocity((double) *(my_buffer+n_count+mybuf_ind++),(double) *(my_buffer+n_count+mybuf_ind++),(double) *(my_buffer+n_count+mybuf_ind++));
-            atom.set_myepot((double) *(my_buffer+n_count+mybuf_ind++));
+            atom.set_myposition((double) *(my_buffer[n_count]+mybuf_ind++),(double) *(my_buffer[n_count]+mybuf_ind++),(double) *(my_buffer[n_count]+mybuf_ind++));
+            atom.set_myvelocity((double) *(my_buffer[n_count]+mybuf_ind++),(double) *(my_buffer[n_count]+mybuf_ind++),(double) *(my_buffer[n_count]+mybuf_ind++));
+            atom.set_myepot((double) *(my_buffer[n_count]+mybuf_ind++));
 
 
         	// global cell coordinate from particle position
@@ -735,23 +735,23 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		int buf_count = buffer_size * 10; // buffer_size (to be allocated via suitable param file)
 
 		// N1 N2 N4 N6 N3 N5 N7
-		double* nb_buffer[7],nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6; // to be allocated and send
+		double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
 
 		// allocate memory (to send to neighbors)
 		nb_0 = new double [buf_count]; nb_1= new double [buf_count]; nb_2 = new double [buf_count];
 		nb_3 = new double [buf_count]; nb_4= new double [buf_count]; nb_5 = new double [buf_count];
 		nb_6 = new double [buf_count];
 
-		nb_buffer[7]={nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
+		double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
 
-		double* my_buffer[7],my_0,my_1,my_2,my_3,my_4,my_5,my_6; // to be received and filled in sphere cells
+		double *my_0, *my_1, *my_2, *my_3, *my_4, *my_5, *my_6; // to be received and filled in sphere cells
 
 		// allocate memory (to receive from neighbors)
 		my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
 		my_3 = new double [buf_count]; my_4= new double [buf_count]; my_5 = new double [buf_count];
 		my_6 = new double [buf_count];
 
-		my_buffer={my_0,my_1,my_2,my_3,my_4,my_5,my_6};
+		double* my_buffer[7] = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
 
 		// neighbor cpu global coordinate
 		double nb_gcoord [7][3]; // [neighbor] [gcoord_x gcoord_y gcoord_z]
@@ -893,7 +893,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    for(int j=0; j<7;j++ ){ // loop over all neighbor cpu
 	    	    buf_counter=1;
 	    	    // get received neighbor chosen particle positions
-	    	    ref_pos.x = *rec_pos(j+0); ref_pos.y = *rec_pos(j+1); ref_pos.z = *rec_pos(j+2);
+	    	    ref_pos.x = *rec_pos[j+0]; ref_pos.y = *rec_pos[j+1]; ref_pos.z = *rec_pos[j+2];
 
 	    	    for (int k=0; k<neig_cells_size[j]; k++){ // loop over each neighbor sub total
 	    	         part_count = neighb[ind].get_nparticles(); //get total particles
@@ -928,16 +928,16 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	                                           // *************************************************
 
 	                                           // ADD TO BUFFER nb_buffer
-	                                           *(nb_buffer+j+buf_counter++)  = temp_id;
-	                                           *(nb_buffer+j+buf_counter++)  = temp_type;
-	                                           *(nb_buffer+j+buf_counter++)  = temp_mass;
-	                                           *(nb_buffer+j+buf_counter++)  = temp_pos.x;
-	                                           *(nb_buffer+j+buf_counter++)  = temp_pos.y;
-	                                           *(nb_buffer+j+buf_counter++)  = temp_pos.z;
-	                                           *(nb_buffer+j+buf_counter++)  = temp_vel.x;
-	                                           *(nb_buffer+j+buf_counter++)  = temp_vel.y;
-	                                           *(nb_buffer+j+buf_counter++)  = temp_vel.z;
-	                                           *(nb_buffer+j+buf_counter++)  = temp_epot;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_id;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_type;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_mass;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.x;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.y;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.z;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.x;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.y;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.z;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_epot;
 		    			                 }
 		    		                }
 		    		                else{ // include all particles inside mc_rsweep
@@ -951,16 +951,16 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	                                    temp_epot =  neighb[ind].get_particle(val).get_myepot();
 
 	                                    // ADD TO BUFFER nb_nb_buffer_0
-	                                    *(nb_buffer+j+buf_counter++) = temp_id;
-	                                    *(nb_buffer+j+buf_counter++) = temp_type;
-	                                    *(nb_buffer+j+buf_counter++) = temp_mass;
-	                                    *(nb_buffer+j+buf_counter++) = temp_pos.x;
-	                                    *(nb_buffer+j+buf_counter++) = temp_pos.y;
-	                                    *(nb_buffer+j+buf_counter++) = temp_pos.z;
-	                                    *(nb_buffer+j+buf_counter++) = temp_vel.x;
-	                                    *(nb_buffer+j+buf_counter++) = temp_vel.y;
-	                                    *(nb_buffer+j+buf_counter++) = temp_vel.z;
-	                                    *(nb_buffer+j+buf_counter++) = temp_epot;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_id;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_type;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_mass;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.x;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.y;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.z;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.x;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.y;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.z;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_epot;
 
 		             	            }
 
@@ -971,7 +971,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    	    } // loop over each neighbor sub total
 	    	    // no of particles in each neighbor buffer
 	    	    total_particles = (buf_counter-1) * 0.1 ;     //10 attributes for each particle
-                *(nb_buffer+j)  = (double) total_particles;  // each buffer first location has particles count
+                *(nb_buffer[j])  = (double) total_particles;  // each buffer first location has particles count
 
 		} // end of Neighbor cpu loop
 
@@ -1082,24 +1082,24 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
         for(int j=0; j<7; j++){
 
-        	p_count = (long) *(my_buffer+j); // no of particles in buffer
+        	p_count = (long) *(my_buffer[j]); // no of particles in buffer
         	buf_ind = 1;                      // initialize for each buffer list
 
         	if(p_count !=0){
              	for (long i=0; i< p_count; i++){
 
-                      atom.set_mynumber((long) *(my_buffer+j+buf_ind++));
-                      atom.set_mytype((int) *(my_buffer+j+buf_ind++));
-                      atom.set_mymass((double) *(my_buffer+j+buf_ind++));
+                      atom.set_mynumber((long) *(my_buffer[j]+buf_ind++));
+                      atom.set_mytype((int) *(my_buffer[j]+buf_ind++));
+                      atom.set_mymass((double) *(my_buffer[j]+buf_ind++));
 
                       // shifting origin of coordinate system
-                      temp_position_x = (double) *(my_buffer+j+buf_ind++) - ref_xmin;
-                      temp_position_y = (double) *(my_buffer+j+buf_ind++) - ref_ymin;
-                      temp_position_z = (double) *(my_buffer+j+buf_ind++) - ref_zmin;
+                      temp_position_x = (double) *(my_buffer[j]+buf_ind++) - ref_xmin;
+                      temp_position_y = (double) *(my_buffer[j]+buf_ind++) - ref_ymin;
+                      temp_position_z = (double) *(my_buffer[j]+buf_ind++) - ref_zmin;
 
                       atom.set_myposition(temp_position_x,temp_position_y,temp_position_z);
-                      atom.set_myvelocity((double) *(my_buffer+j+buf_ind++),(double) *(my_buffer+j+buf_ind++),(double) *(my_buffer+j+buf_ind++));
-                      atom.set_myepot((double) *(my_buffer+j+buf_ind++));
+                      atom.set_myvelocity((double) *(my_buffer[j]+buf_ind++),(double) *(my_buffer[j]+buf_ind++),(double) *(my_buffer[j]+buf_ind++));
+                      atom.set_myepot((double) *(my_buffer[j]+buf_ind++));
 
                       // appending particle instance to sphere cell list
                       sphere_cell.add_particle(atom);
@@ -1720,7 +1720,8 @@ void calc_mc_cpu_cell_array(){
 
   /* volume */
   mc_volume = scalar_prod( mc_simbox_x, mc_tbox_x );
-  if ((0==mc_prank) && (0==mc_volume)) std::cerr("Box Edges are parallel.");
+  if ((0==mc_prank) && (0==mc_volume))
+	  std::cerr <<"Box Edges are parallel.";
 
   /* normalization */
   mc_tbox_x.x /= mc_volume;  mc_tbox_x.y /= mc_volume;  mc_tbox_x.z /= mc_volume;
@@ -1939,7 +1940,7 @@ ivec3d ivector_prod(ivec3d u, ivec3d v) {
 
 	  //  integer vector - vector product
 
-	   vec3d w;
+	   ivec3d w;
        w.x = u.y * v.z - u.z * v.y;
        w.y = u.z * v.x - u.x * v.z;
        w.z = u.x * v.y - u.y * v.x;

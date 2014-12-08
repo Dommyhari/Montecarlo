@@ -44,7 +44,10 @@ int mc_get_velocity = 0;    // 0: default, 1: MD need velocity data
 
 // NEED DEVELOPMENT: param file reader to be developed
 // should be passed as a parameter file
-char* file_name   = "mc_sphere.chkpt";
+
+string str_fname = "mc_sphere.chkpt";
+const char* file_name  = str_fname.c_str();
+
 string md_binary  = "imd_eam_glok_homdef_nbl_virtual_atoms";
 string md_param   = "local_md";
 
@@ -62,7 +65,8 @@ int mc_ncpus;                                   // no of cpus get & assign from 
 vec3d mc_simbox_x,mc_simbox_y,mc_simbox_z;      // get & assign box physical dimension from               MD-init
 int mc_tot_types;                               // get total types from MD
 int mc_real_types;                              // get real types from MD
-ivec3d  mc_restriction[mc_tot_types];           // get restriction vectors from MD all element types
+// for compilation : mc_tot_types = 9
+ivec3d  mc_restriction[9];           // get restriction vectors from MD all element types
 
 // to be initialized in Monte_init methods
 long   mc_tatoms_cpu;                           //  total particles per cpu
@@ -149,7 +153,7 @@ ivec3d win_pos_7 = {1,1,1};
 ivec3d window_position[8]={win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
 
 // some MPI information (NEED ALLOCATION)
-long buffer_size = mc_tatoms_cpu; // total no of particles + threshold value
+long buffer_size; // total no of particles + threshold value
 
 //to be included suitable declaration to assign the following quantities
 

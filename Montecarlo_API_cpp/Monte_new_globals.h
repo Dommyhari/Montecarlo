@@ -1,28 +1,18 @@
 /*
- * Monte_globals.h
+ * Monte_new_globals.h
  *
- *  Created on: Oct 2, 2014
+ *  Created on: Mar 6, 2015
  *      Author: ganeshfx
  */
 
+#ifndef MONTE_NEW_GLOBALS_H_
+#define MONTE_NEW_GLOBALS_H_
 
 
-#ifndef MONTE_GLOBALS_H_
-#define MONTE_GLOBALS_H_
 
 
-#include<iomanip>
-#include<fstream>
-#include<string>
-#include<iostream>
-#include<ctime>
-#include<cmath>
-#include<cstdlib>
-#include<random>
+#include "Monte_new_classes.h" // class declarations
 
-
-#include "Monte_classes.h" // class declarations
-#include "mpi.h"
 
 //using namespace std;
 
@@ -92,9 +82,9 @@ int    mc_sample_seed;                          //  seed for zone sampler
 
 // Montecarlo variables
 int    mc_nbcells = 27 ;                        // 27  NB cells count
-long   mc_real_cpu ;                            // total real particles per CPU
-long   mc_phold_cpu;                            // total placeholders in CPU
-long   mc_carb_cpu ;                            // total carbons in CPU
+long   mc_real_cpu=0 ;                            // total real particles per CPU
+long   mc_phold_cpu=0;                            // total placeholders in CPU
+long   mc_carb_cpu=0 ;                            // total carbons in CPU
 
 // ---------------------------------------------------------------
 
@@ -119,10 +109,6 @@ vec3d mc_tbox_x,mc_tbox_y,mc_tbox_z;                                  // mc_tran
 
 //:  calc_cell_dim(rsample)
 vec3d mc_cell_dim;                                                    // cell dimensions for MC                                 MC
-
-//:make_mc_tbox() -- implicit definition
-double mc_volume;                                                    // some internal attributes for mapping
-vec3d mc_height;                                                      // used for global cell coordinates
 
 
 // windows sampler
@@ -174,7 +160,11 @@ long buffer_size; // total no of particles + threshold value
 
 //to be included suitable declaration to assign the following quantities
 
-int stack_total;  // total no of stacks
+//int stack_total;  // total no of stacks
+//int row_total ;   // total no of row
+//int col_total;    // total no of cols
+
+
 int ncells_cpu;   // no of cells per cpu
 int ncells_stack; // no of cells per stack in a cpu
 
@@ -189,8 +179,6 @@ int stacks_block;   // no of stacks in global computation domain
 celltype old_sphere_config;
 celltype new_sphere_config;
 
-// Method definitions
 
-//void calc_cell_dim(double rsample);
 
-#endif /* MONTE_GLOBALS_H_ */
+#endif /* MONTE_NEW_GLOBALS_H_ */

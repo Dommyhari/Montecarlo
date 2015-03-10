@@ -4,9 +4,8 @@
  *              contain all utility methods for Montecarlo
  *******************************************************************************/
 
-#include "Monte_classes.h"
-#include "Monte_globals.h"
 #include "Monte_prototypes.h"
+#include "Monte_globals.h"
 
 using namespace std;
 
@@ -52,6 +51,55 @@ void setup_config(){
 
 }
 
+int acceptance_check(int type,celltype old_sphere,celltype new_sphere){
+
+	int flag=0,old_type,new_type;
+	double epot_old =0.0,epot_new =0.0, avg_epot_old =0.0, avg_epot_new = 0.0;
+    long old_count=0, new_count=0;
+
+	// Energy computation
+    if(type == 0){
+
+    	// sanity check
+    	if (old_sphere.get_nparticles() == new_sphere.get_nparticles()){
+    		cout<< " Sphere check: constant no of particles " << endl;
+
+    		// loop over particles in old and new sphere
+    		for(long i=0;i<old_sphere.get_nparticles();i++){
+
+    			  old_type = old_sphere.get_particle(i).get_mytype();
+    			  new_type = new_sphere.get_particle(i).get_mytype();
+
+                  // start from here
+    			  if( old_type == 0 || old_type == 1 ){
+    				  epot_old += old_sphere.get_particle(i).get_myepot();
+                      old_count++;
+    			  }
+
+    			  if( new_type == 0 || new_type == 1 ){
+    				  epot_new += new_sphere.get_particle(i).get_myepot();
+                      new_count++;
+    			  }
+    		}
+
+    		// compute average epot (include other criteria later)
+    		avg_epot_old = epot_old / old_count;
+    		avg_epot_new = epot_new / new_count;
+
+    		if (avg_epot_new < avg_epot_old){
+
+    			flag = 1;
+    		}
+
+    	}
+    	else{
+    		cout<< " Sphere check: inconsistent no of particles / broken configuration " << endl;
+    	}
+    }
+
+	return flag;
+}
+
 // seems OK
 void update_particle( cellblock bobj,int  cell_id, particle ref_atom ){
 
@@ -62,19 +110,22 @@ void update_particle( cellblock bobj,int  cell_id, particle ref_atom ){
 	   // C++:  make use of copy constructor after checking
 
 	   // get particles count
-	   long p_count = bobj.get_cell(cell_id).get_nparticles();
-	   long loc_id = ref_atom.get_mynumber();
+//	   long p_count = bobj.get_cell(cell_id).get_nparticles();
+//	   long loc_id = ref_atom.get_mynumber();
 
-	   // loop over particles in cell
-	   for ( long i=0; i<p_count; i++ ){
-		   if ( bobj.get_cell(cell_id).get_particle(i).get_mynumber() == loc_id) { // particle id matching
-			   // updating atom attributes
-		       bobj.get_cell(cell_id).get_particle(i).set_mytype(ref_atom.get_mytype());
-			   bobj.get_cell(cell_id).get_particle(i).set_myposition(ref_atom.get_myposition().x,ref_atom.get_myposition().y,ref_atom.get_myposition().z);
-			   bobj.get_cell(cell_id).get_particle(i).set_myvelocity(ref_atom.get_myvelocity().x,ref_atom.get_myvelocity().y,ref_atom.get_myvelocity().z);
-			   bobj.get_cell(cell_id).get_particle(i).set_myepot(ref_atom.get_myepot());
-		   }
-	   }
+//	   // loop over particles in cell
+//	   for ( long i=0; i<p_count; i++ ){
+//		   if ( bobj.get_cell(cell_id).get_particle(i).get_mynumber() == loc_id) { // particle id matching
+//			   // updating atom attributes
+//		       bobj.get_cell(cell_id).get_particle(i).set_mytype(ref_atom.get_mytype());
+//			   bobj.get_cell(cell_id).get_particle(i).set_myposition(ref_atom.get_myposition().x,ref_atom.get_myposition().y,ref_atom.get_myposition().z);
+//			   bobj.get_cell(cell_id).get_particle(i).set_myvelocity(ref_atom.get_myvelocity().x,ref_atom.get_myvelocity().y,ref_atom.get_myvelocity().z);
+//			   bobj.get_cell(cell_id).get_particle(i).set_myepot(ref_atom.get_myepot());
+//		   }
+//	   }
+
+	   // add the particle
+	   bobj.get_cell(cell_id).add_particle(ref_atom);
 
 }
 
@@ -143,10 +194,14 @@ particle sample_zone(cellblock bobj,int win_id){
     int count=0,rand_cell;
     long ncells = bobj.get_ncells();
 
-    ivec6d zone_limit[8];
+    //ivec6d zone_limit[8];
 
     // zone_limit: define sample window positions (x,y,z)
     // NOTE: HARDCODED FOR 8 CELLS IN A WINDOW
+
+    // Multiple definition error part
+
+    /*
     zone_limit[0] = {0,1,0,1,0,1}; // sample window 1
     zone_limit[1] = {0,1,0,1,1,2}; // sample window 2
     zone_limit[2] = {1,2,0,1,0,1}; // sample window 3
@@ -155,7 +210,7 @@ particle sample_zone(cellblock bobj,int win_id){
     zone_limit[5] = {0,1,1,2,1,2}; // sample window 6
     zone_limit[6] = {1,2,1,2,0,1}; // sample window 7
     zone_limit[7] = {1,2,1,2,1,2}; // sample window 8
-
+    */   
 
     // prepare cell list as per sample window id
 
@@ -188,19 +243,22 @@ particle sample_zone(cellblock bobj,int win_id){
 
 	atom = cobj.get_particle(rand_no);
 
+	//--------------------- Unwanted replication - refer construct_sphere ---------------------//
 	// make change only in particle object instance
 	// swapping placeholder into carbon
 	// HC: hardcoded to 1
-    atom.set_mytype(1);
+    //atom.set_mytype(1);
+    //-----------------------------------------------------------------------------------------//
 
-    // construct sphere around selected particle
-    construct_sphere(atom,bobj,win_id,file_name);
+    // construct sphere around selected particle and get the reference sphere before any trial move
+    old_sphere_config = construct_sphere(atom,bobj,win_id,file_name);
 
 	return atom;
 }
 
 // seems OK
-void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cellblock bobj){
+//void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cellblock bobj){
+void read_update_config (int win_id,const char* fname,particle pobj,cellblock bobj){
 
 	// NEED CHANGES
 
@@ -211,6 +269,11 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 	//            1 - File reading part             //
     //----------------------------------------------//
 
+    celltype sphere_new;            // contains particles in spherical domain for LOCAL MD simulation
+    particle updated_atom;          // particle object
+
+
+	int accep_tag=0;
 	const int LIMIT=1000;
 	// file buffers to store atom data's read from last configuration
     vector<long>     fbuffer_id;
@@ -269,73 +332,102 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
 	double *my_0, *my_1, *my_2, *my_3, *my_4, *my_5, *my_6;   // to be received and filled in sphere cells
 
-	// allocate memory (to receive for neighbors)
+	// allocate memory (to receive from neighbors)
 	my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
 	my_3 = new double [buf_count]; my_4= new double [buf_count]; my_5 = new double [buf_count];
 	my_6 = new double [buf_count];
 
 	double* my_buffer[7] = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
 
-    //********************************************************************************
-	// open and read file only if configuration get accepted
-    //********************************************************************************
+	// input file stream instance
+    ifstream fin(fname,std::ios_base::in);
 
-	if(accep_tag){
+    // local value holders
+    long f_id; int f_type;
+    double f_mass,f_posx,f_posy,f_posz,f_velx,f_vely,f_velz,f_epot;
 
-	        // input file stream instance
-            ifstream fin(fname,std::ios_base::in);
+	// initialize reference particle
+	vec3d vec1 = pobj.get_myposition();
 
-            // local value holders
-            long f_id; int f_type;
-            double f_mass,f_posx,f_posy,f_posz,f_velx,f_vely,f_velz,f_epot;
+	// get reference particle sweep boundary
+	double ref_xmin = vec1.x - (mc_rsweep + mc_sphere_wall);
+	double ref_ymin = vec1.y - (mc_rsweep + mc_sphere_wall);   // minimum boundary
+	double ref_zmin = vec1.z - (mc_rsweep + mc_sphere_wall);
 
-	        // initialize reference particle
-	        vec3d vec1 = pobj.get_myposition();
+    char headerline[LIMIT];
 
-	        // get reference particle sweep boundary
-	        double ref_xmin = vec1.x - (mc_rsweep + mc_sphere_wall);
-	        double ref_ymin = vec1.y - (mc_rsweep + mc_sphere_wall);   // minimum boundary
-	        double ref_zmin = vec1.z - (mc_rsweep + mc_sphere_wall);
+    cout<< " Reading simulation sphere file " << fname << endl;
 
-            char headerline[LIMIT];
+    // crunch header part
+    while (fin.get() == '#'){
+          fin.getline(headerline,LIMIT,'\n');
+          continue;
+    }
 
-            cout<< " Reading simulation sphere file " << fname << endl;
+    // read and fill buffer
+    while( !fin.eof()){ // end of file check
 
-            // crunch header part
-            while (fin.get() == '#'){
-                  fin.getline(headerline,LIMIT,'\n');
-                  continue;
-            }
+    	   // reading         // pushing
+           fin>>f_id;        fbuffer_id.push_back(f_id);
 
-            // read and fill buffer
-            while( !fin.eof()){ // end of file check
+           // set back virtual particles to real particles on sphere boundary
+           fin>>f_type;
+           if(f_type > mc_real_types) { f_type-=mc_real_types; }
 
-    	              // reading         // pushing
-                      fin>>f_id;        fbuffer_id.push_back(f_id);
+           fbuffer_type.push_back(f_type);
+           fin>>f_mass;      fbuffer_mass.push_back(f_mass);
 
-                      // set back virtual particles to real particles on sphere boundary
-                      fin>>f_type;
-                      if(f_type > mc_real_types) { f_type-=mc_real_types; }
+           // shift back to native coordinate  system
+           fin>>f_posx;      fbuffer_pos_x.push_back(f_posx + ref_xmin);
+           fin>>f_posy;      fbuffer_pos_y.push_back(f_posy + ref_ymin);
+           fin>>f_posz;      fbuffer_pos_z.push_back(f_posz + ref_zmin);
 
-                      fbuffer_type.push_back(f_type);
-                      fin>>f_mass;      fbuffer_mass.push_back(f_mass);
+           fin>>f_velx;      fbuffer_vel_x.push_back(f_velx);
+           fin>>f_vely;      fbuffer_vel_y.push_back(f_vely);
+           fin>>f_velz;      fbuffer_vel_z.push_back(f_velz);
+           fin>>f_epot;      fbuffer_epot.push_back(f_epot);
+    }
+    fin.clear(); // resetting bit states
+    fin.close();
 
-                      // shift back to native coordinate origin system
-                      fin>>f_posx;      fbuffer_pos_x.push_back(f_posx + ref_xmin);
-                      fin>>f_posy;      fbuffer_pos_y.push_back(f_posy + ref_ymin);
-                      fin>>f_posz;      fbuffer_pos_z.push_back(f_posz + ref_zmin);
+    // loop over file buffers for constructing updated sphere
 
-                      fin>>f_velx;      fbuffer_vel_x.push_back(f_velx);
-                      fin>>f_vely;      fbuffer_vel_y.push_back(f_vely);
-                      fin>>f_velz;      fbuffer_vel_z.push_back(f_velz);
-                      fin>>f_epot;      fbuffer_epot.push_back(f_epot);
-            }
-            fin.clear(); // resetting bit states
-            fin.close();
+    int p_con=0, v_con=0;
+    for(int count=0; count<fbuffer_id.size();count++){
 
-            //----------------------------------------------------------------//
-            //           2- Updating and shifting part                        //
-            //----------------------------------------------------------------//
+    	updated_atom.set_mynumber(fbuffer_id[count]);
+    	updated_atom.set_mytype(fbuffer_type[count]);
+    	updated_atom.set_mymass(fbuffer_mass[count]);
+    	updated_atom.set_myposition(fbuffer_pos_x[p_con++],fbuffer_pos_y[p_con++],fbuffer_pos_z[p_con++]);
+    	updated_atom.set_myvelocity(fbuffer_vel_x[v_con++],fbuffer_vel_y[v_con++],fbuffer_vel_z[v_con++]);
+    	updated_atom.set_myepot(fbuffer_epot[count]);
+
+    	// appending particle instance to sphere cell list
+    	sphere_new.add_particle(updated_atom);
+    }
+
+    new_sphere_config = sphere_new;
+
+    //----------------------------------------------------------------//
+    //                  check here the acceptance condition
+    //----------------------------------------------------------------//
+
+    int check_type=0;     // type of acceptance condition
+
+    accep_tag = acceptance_check(check_type,old_sphere_config,new_sphere_config);
+
+    //check the neighbor which accepted its configuration
+
+
+    //----------------------------------------------------------------//
+    //           2- Updating and shifting part                        //
+    //----------------------------------------------------------------//
+
+
+    // Update if configuration get accepted
+
+
+    if(accep_tag){
 
             particle atom;
 
@@ -358,7 +450,7 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
             	type_check = fbuffer_type.at(i);
 
-            	if(type_check < mc_real_types){ // ignore spherical wall particles
+            	if(type_check < mc_real_types){ // ignore spherical wall particles (CHECK: reconsider this!!)
 
             	    buf_ind = 1;                      // initialize for each buffer step
             	    // attributes assignments
@@ -420,6 +512,9 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
                         // updating buffer size for every particle belongs to it
                         buff_size[target] = buf_ind-1; // check it!!
+
+
+
          		    }
 
          		    else{ // particles from my CPU
@@ -444,6 +539,9 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
          		        atom.set_myepot(fbuffer_epot.at(i));
 
          		        // update particle attributes in main location
+         		        // IMPORTANT CHECK: whether it may jump across domain??
+
+         		        // have to revise such that add the particle directly instead of update
          		        update_particle(bobj,cell_index,atom);
 
          		    }
@@ -456,6 +554,8 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
             for (int r_count=0; r_count<7; r_count++){
     	      total_particles       = buff_size[r_count] * 0.1 ;  // 10 attributes for each particle
               *(nb_buffer[r_count])  = (double) total_particles;  // each buffer first location has particles count
+
+
             }
 
 	} // acceptance condition
@@ -555,15 +655,27 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
     int loc_rank, cell_index;
 
     particle atom;
+    long nb_particles; // no of particles updated from neighbor
 
 	// loop over my_received buffers and update particles if necessary
 	for(int n_count=0;n_count<7;n_count++){
+
+		nb_particles = 0;
+		// delete the 7 list accordingly
 
 		rec_particles = (long) *(my_buffer+n_count);
 		mybuf_ind =1;
 
 		// check for empty buffer
-        if(rec_particles !=0 ){
+		// remove particles sent for sphere constructions to corresponding neighbors
+
+		// IGNORED DURING TESTING
+		//if(rec_particles !=0 ) { remove_particles(list_ids[n_count]);    }
+
+
+        while(nb_particles <rec_particles){
+
+
 
             atom.set_mynumber((long) *(my_buffer[n_count]+mybuf_ind++));
             atom.set_mytype((int) *(my_buffer[n_count]+mybuf_ind++));
@@ -580,7 +692,9 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 
 
         	// global cell coordinate from particle position
-     	    cell_glob_coord = cell_coordinate(temp_pos_x, temp_pos_y, temp_pos_z);
+     	    //cell_glob_coord = cell_coordinate(temp_pos_x, temp_pos_y, temp_pos_z);
+
+     	    cell_glob_coord = cell_coordinate(atom.get_myposition().x,atom.get_myposition().y,atom.get_myposition().z);
 
  		    // CPU global coordinate from cell global coordinate
  		    nb_cpu_gcoord = calc_cpu_coord(cell_glob_coord) ;
@@ -595,8 +709,11 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 		    // update particle attributes in main location
 		    update_particle(bobj,cell_index,atom);
 
+		    nb_particles++;
         }
 
+		// clear particle id list
+		list_ids[n_count].clear();
 	}
 
 	//********************************************************************
@@ -628,8 +745,9 @@ void read_update_config (int accep_tag,int win_id,char* fname,particle pobj,cell
 }
 
 // seems OK
-void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
+//void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
+celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename){
 
 	    // select neighbors as per sample window position
 		int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
@@ -674,13 +792,11 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 		       // front comm
 		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),0,comm_name);
 		       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),1,comm_name,&status);
-
 		     }
 		     else{
 
 		       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind]),0,comm_name,&status);
 		       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind]),1,comm_name);
-
 		     }
 		}
 
@@ -765,17 +881,17 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
         // boundary checks and flag assignments (ENSURE COORDINATES SHIFT IF REQUIRED)
 
-        // z check  with  N1 (1st neighbor)
+        // z check  with  N1 ( Neighbor -1)
         if( (nb_gcoord[0][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[0][2] = -1;}
         if( (nb_gcoord[0][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[0][2] = +1;}
 
-        // x-z check with N2 (2nd neighbor)
+        // x-z check with N2 ( Neighbor -2)
         if( (nb_gcoord[1][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[1][0] = -1;}
         if( (nb_gcoord[1][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[1][0] = +1;}
         if( (nb_gcoord[1][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[1][2] = -1;}
         if( (nb_gcoord[1][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[1][2] = +1;}
 
-        // x-y-z check with N4 (3rd neighbor)
+        // x-y-z check with N4 ( Neighbor -3)
         if( (nb_gcoord[2][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[2][0] = -1;}
         if( (nb_gcoord[2][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[2][0] = +1;}
         if( (nb_gcoord[2][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[2][1] = -1;}
@@ -783,23 +899,23 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
         if( (nb_gcoord[2][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[2][2] = -1;}
         if( (nb_gcoord[2][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[2][2] = +1;}
 
-        // y-z check with N6 (4th neighbor)
+        // y-z check with N6 ( Neighbor -4)
         if( (nb_gcoord[3][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[3][1] = -1;}
         if( (nb_gcoord[3][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[3][1] = +1;}
         if( (nb_gcoord[3][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[3][2] = -1;}
         if( (nb_gcoord[3][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[3][2] = +1;}
 
-        // x check with N3  (5th neighbor)
+        // x check with N3  ( Neighbor -5)
         if( (nb_gcoord[4][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[4][0] = -1;}
         if( (nb_gcoord[4][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[4][0] = +1;}
 
-        // x-y check with N5 (6th neighbor)
+        // x-y check with N5 ( Neighbor -6)
         if( (nb_gcoord[5][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[5][0] = -1;}
         if( (nb_gcoord[5][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[5][0] = +1;}
         if( (nb_gcoord[5][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[5][1] = -1;}
         if( (nb_gcoord[5][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[5][1] = +1;}
 
-        // y check with N7 (7th neighbor)
+        // y check with N7 ( Neighbor -7)
         if( (nb_gcoord[6][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[6][1] = -1;}
         if( (nb_gcoord[6][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[6][1] = +1;}
 
@@ -807,11 +923,18 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    ivec3d test, nb_test[19];
 
 	    // window sampling cells (my own cells)
+	    // later generalize for more than 8 cells
+
 	    celltype sample_cells[8];
 
+	    // ***************************************************************************
 	    //window neighbor cells (to be sent)
         // no of each neighbor cells ( N1 N2 N4 N6 N3 N5 N7 )
+	    // to be generalized later
         int neig_cells_size [7]={4,2,1,2,4,2,4};
+
+        // (Check this for generality)
+        //****************************************************************************
 
         // list of neighbor receive cells
         celltype neighb[19];
@@ -844,6 +967,13 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    nb_test[2].x =nb_xmin; nb_test[2].y = nb_ymax; nb_test[2].z = nb_z;    neighb[2] = bobj.cell_with_lcoord(nb_test[2],ncells);
 	    nb_test[3].x =nb_xmax; nb_test[3].y = nb_ymax; nb_test[3].z = nb_z;    neighb[3] = bobj.cell_with_lcoord(nb_test[3],ncells);
 
+
+//      conceptual idea
+//	    //updating cell
+//	    bobj.delete_cell(bobj.cell_with_lcoord(nb_test[0],ncells).get_cell_id());
+//
+//	    bobj.add_cell(neighb[0]);
+
         //Neighbor-2 (N2)
         nb_test[4].x = nb_x; nb_test[4].y = nb_ymin; nb_test[4].z = nb_z;      neighb[4] = bobj.cell_with_lcoord(nb_test[4],ncells);
         nb_test[5].x = nb_x; nb_test[5].y = nb_ymax; nb_test[5].z = nb_z;      neighb[5] = bobj.cell_with_lcoord(nb_test[5],ncells);
@@ -871,9 +1001,9 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    nb_test[17].x =nb_xmax; nb_test[17].y = nb_y; nb_test[17].z = nb_zmin; neighb[17] = bobj.cell_with_lcoord(nb_test[17],ncells);
 	    nb_test[18].x =nb_xmax; nb_test[18].y = nb_y; nb_test[18].z = nb_zmax; neighb[18] = bobj.cell_with_lcoord(nb_test[18],ncells);
 
-	    //***********************************************************
-	    //                  My received neighbor part - fill buffers
-	    //**********************************************************
+	    //***************************************************************************
+	    //                  My received neighbor part - fill buffers for my neighbors
+	    //***************************************************************************
 
 	    // sweep distance computation (with squares)
 	    double r_full   = pow((mc_rsweep + mc_sphere_wall),2.0);
@@ -914,8 +1044,13 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 
 	     	    			             // ignore placeholders on sphere wall
 		    			                 if (temp_type != (double) 2 ) { // HC: now hardcoded for placeholders
+
 		    			        	           temp_id     = (double) (neighb[ind].get_particle(val).get_mynumber());
-		    			        	           temp_type   = (double) (temp_type + mc_real_types);  // HC: hardcoded for ntypes=3
+
+		    			        	           // add particle id that are sent for sphere constructions
+		    			        	           list_ids[j].push_back(temp_id);
+
+		    			        	           temp_type   = (double) (temp_type + mc_real_types);
 	                                           temp_mass   =  neighb[ind].get_particle(val).get_mymass();
 
 	                                           // assign temporary position (coordinates shifted if neighbors on cpu boundary)
@@ -1040,12 +1175,12 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    // allocate received buffers if any
 	    // analyze received buffers and fill into sphere cells if necessary
 	    // **************************************************************************
-        celltype sphere_cell;    // contains particles in spherical domain for LOCAL MD simulation
+        celltype sphere_cell, sphere_old;    // contains particles in spherical domain for LOCAL MD simulation
         particle atom,my_atom;   // particle object
 
 	    int count=0;
 
-	    // prepare SAMPLE cell list as per sample window id
+	    // prepare SAMPLE cell list as per sample window id for my own CPU
 
 	    for(int i=zone_limit[win_id].xmin;i<=zone_limit[win_id].xmax;i++){
 	    	for(int j=zone_limit[win_id].ymin;j<=zone_limit[win_id].ymax;j++){
@@ -1167,17 +1302,31 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
         // adding randomly chosen particle of own cpu
         my_atom = pobj;
 
-        // flip its type to real Carbon
-        my_atom.set_mytype(1);
 
         // shifting origin of coordinate system
         temp_position_x = my_atom.get_myposition().x - ref_xmin;
         temp_position_y = my_atom.get_myposition().y - ref_ymin;
         temp_position_z = my_atom.get_myposition().z - ref_zmin;
 
+
+
         my_atom.set_myposition(temp_position_x,temp_position_y,temp_position_z);
 
+        // adding chosen particle
         sphere_cell.add_particle(my_atom);
+
+        // creating reference sphere configuration
+        sphere_old = sphere_cell;
+
+        // ***********************************************************************
+        // INCLUDE OTHER TWO TRIAL MOVES HERE
+        // ***********************************************************************
+
+        // flip its type to real Carbon (SWAPPING PLACEHOLDER INTO CARBON)
+
+        sphere_cell.get_particle(my_atom.get_mynumber()).set_mytype(1);
+        //my_atom.set_mytype(1);
+
 
         // *********************************************************************
         //                          file writing methods
@@ -1229,6 +1378,7 @@ void construct_sphere(particle pobj, cellblock bobj, int win_id,char* filename){
 	    delete[] my_0; delete[] my_1;delete[] my_2; delete[] my_3;
 	    delete[] my_4;delete[] my_5;delete[] my_6;
 
+	    return sphere_old;
 }
 
 // check if really required
@@ -1546,6 +1696,9 @@ void create_maxwell_velocities(cellblock loc_obj,double mc_temp, ivec3d*  mc_res
 
 }
 
+
+
+
 void make_cells(cellblock loc_obj){
 
 	// DO CHECKING
@@ -1816,11 +1969,30 @@ ivec3d cell_coordinate(double x, double y, double z){
 //
 //} //calc_cpu_block_limits
 
+
+// Tesing fragment
 void calc_cell_dim(double rsample){
 	//    compute MonteCarlo cell dimension
-	mc_cell_dim.x = (mc_simbox_x.x) / (rsample);
-	mc_cell_dim.y = (mc_simbox_y.y) / (rsample);
-	mc_cell_dim.z = (mc_simbox_z.z) / (rsample);
+	//mc_cell_dim.x = (mc_simbox_x.x) / (rsample);
+	//mc_cell_dim.y = (mc_simbox_y.y) / (rsample);
+	//mc_cell_dim.z = (mc_simbox_z.z) / (rsample);
+
+	cout << " *****************************************" << endl;
+    cout << "     Monte_methods.cpp    // calc_cell_dim "<< endl;
+	cout << " *****************************************" << endl;
+
+//	cout << " mc_cell_dim.x : " << mc_cell_dim.x;
+//	cout << " mc_cell_dim.y : " << mc_cell_dim.y;
+//	cout << " mc_cell_dim.z : " << mc_cell_dim.z;
+
+	cout << " mc_cell_dim.x : " << rsample;
+	cout << " mc_cell_dim.y : " << rsample;
+	cout << " mc_cell_dim.z : " << rsample;
+
+
+
+	cout << " ==========================================" << endl;
+
 }
 
 int calc_ncells_cpu(){

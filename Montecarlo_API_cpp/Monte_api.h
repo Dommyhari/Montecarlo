@@ -8,6 +8,7 @@
 #ifndef MONTE_API_H_
 #define MONTE_API_H_
 
+//#include "mpi.h"
 
 /*  function prototypes */
 
@@ -24,7 +25,7 @@ extern "C" {
 		double  *md_mc_atommass,double  *md_mc_positions , double *md_mc_epot);
 
     // perform montecarlo sampling and export updated data
-    void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumber,int **md_atomtypes,
+    void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumber,int **md_atomtypes,
     		double **md_atommass,double **md_positions);
 
     // export current velocities from MOntecarlo

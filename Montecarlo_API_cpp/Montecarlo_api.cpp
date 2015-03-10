@@ -8,10 +8,10 @@
 
 /*  MC routine */
 
-#include "Monte_classes.h"     // class declarations
-#include "Monte_globals.h"     // global variable definitions
-#include "Monte_prototypes.h"  // Internal method declarations
-#include "Monte_api.h"               // Interface method declarations
+#include "Monte_new_prototypes.h"  // Internal method declarations
+
+#include "Monte_globals.h"  // global variable definitions
+#include "Monte_api.h"         // Interface method declarations
 
 using namespace std;
 
@@ -30,10 +30,13 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
     // real types
     mc_real_types = md_real_types;
 
+    cout << "Changes made by REMOTE " << endl;
+    cout << "Change created and here I am " << endl; 
+
     // mc simbox dimensions
-    mc_simbox_x.x = *(md_simbox);   mc_simbox_x.y = 0.0;              mc_simbox_x.z = 0.0;
-    mc_simbox_y.x = 0.0;            mc_simbox_y.y = *(md_simbox++);   mc_simbox_y.z = 0.0;
-    mc_simbox_z.x = 0.0;            mc_simbox_z.y = 0.0;              mc_simbox_z.z = *(md_simbox++);
+    mc_simbox_x.x = *(md_simbox++); mc_simbox_x.y = *(md_simbox++);              mc_simbox_x.z = *(md_simbox++);
+    mc_simbox_y.x = *(md_simbox++); mc_simbox_y.y = *(md_simbox++);              mc_simbox_y.z = *(md_simbox++);
+    mc_simbox_z.x = *(md_simbox++); mc_simbox_z.y = *(md_simbox++);              mc_simbox_z.z = *(md_simbox++);
 
     // restriction vector for all element types
     int count=0;
@@ -59,8 +62,49 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
     // process rank
     MPI_Comm_rank(comm_name, &mc_prank);
     
+    cout << "***********************************"<< endl;
+    cout << " Parameter passing check -- init_montecarlo (Montecarlo_api.cpp) " << endl;
+    cout << "***********************************"<< endl;
+    cout << "mc_CPU dimension [ :"<< mc_cpu_dim.x << mc_cpu_dim.y << mc_cpu_dim.z << "]" <<endl;
+
+    cout << " simbox dimension x : [" << mc_simbox_x.x << mc_simbox_x.y << mc_simbox_x.z << " ]" <<endl;
+
+    cout << " simbox dimension y : [" << mc_simbox_y.x << mc_simbox_y.y << mc_simbox_y.z << " ]" <<endl;
+
+    cout << " simbox dimension z : [" << mc_simbox_z.x << mc_simbox_z.y << mc_simbox_z.z << " ]" <<endl;
+
+    for(int i=0; i<mc_tot_types; i++){
+    	cout<<"Restriction [ "<<i<<" ] : "<<mc_restriction[i].x<<mc_restriction[i].y<<mc_restriction[i].z<<endl;
+    }
+
+
+    cout << " mc_temperature : " << mc_temp << endl;
+    cout << " mc_sweep_radii : " << mc_rsweep << endl;
+    cout << " wall thickness : " << mc_sphere_wall << endl;
+    cout << " random no : " << mc_sample_seed << endl;
+
+
+
     // prepare Montecarlo configuration
-    setup_config();
+    //setup_config();
+
+    vec3d loc_cell_dim;
+    loc_cell_dim.x = mc_simbox_x.x;
+    loc_cell_dim.y = mc_simbox_y.y;
+    loc_cell_dim.z = mc_simbox_z.z;
+
+    mc_cell_dim = calc_cell_dim(mc_rsweep,loc_cell_dim);
+
+    cout << " ==================================="<<endl;
+    cout << " Mpntecarlo_api.cpp     " << endl;
+    cout << " mc_cell_dim check " << endl;
+    cout << " mc_cell_dim.x    :  " <<  mc_cell_dim.x << endl;
+    cout << " mc_cell_dim.y    :  " <<  mc_cell_dim.y << endl;
+    cout << " mc_cell_dim.z    :  " <<  mc_cell_dim.z << endl;
+    cout << " ==================================="<<endl;
+
+
+
 }
 
 // seems OK
@@ -109,7 +153,7 @@ extern "C" void pack_config_to_montecarlo(long md_mc_tatoms_cpu,long *md_mc_atom
 
 // NEED TESTING ( acceptance condition part)
 
-extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumber,int **md_atomtypes,
+extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumber,int **md_atomtypes,
     		double **md_atommass,double **md_positions){
 
 
@@ -119,33 +163,37 @@ extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumb
 	cellblock c_obj;
 
 	// construct cells
-    make_cells(c_obj);
+    // edited //make_cells(c_obj);
 
     // create particles
-    make_particles(c_obj);
+	// edited //make_particles(c_obj);
 
     // create velocities (T != 0K)
-    if(!mc_temp) create_maxwell_velocities(c_obj,mc_temp,mc_restriction);
+	// edited //if(!mc_temp) create_maxwell_velocities(c_obj,mc_temp,mc_restriction);
 
 
     //**************************************************************
     //!!!!!!!!!!!!!!!!!!!!!!!!!! check if required
     //**************************************************************
 
-    // select random cell ex: cell-0 // for moving window cell after cell
-//    celltype cell_obj = c_obj.get_cell(0);
+    //    select random cell ex: cell-0 // for moving window cell after cell
+    //    celltype cell_obj = c_obj.get_cell(0);
 
     // construct neighbor list for chosen cell
-//    make_mc_nblist(cell_obj);
+    //    make_mc_nblist(cell_obj);
 
-    // sample window id
+    // sample window id(Hard coded for window 0)
+    // extend the fragment with random selector
+
     int sample_id= 0;
     // particle instance
-    particle sam_particle = sample_zone(c_obj,sample_id);
+
+    // edited // particle sam_particle = sample_zone(c_obj,sample_id);
 
 
     //run local MD
-    do_local_mdrun(md_binary,md_param);
+
+    // edited // do_local_mdrun(md_binary,md_param);
 
     // if accept update
     //update_particle(cell_obj.get_cell_id(),sam_particle);
@@ -154,25 +202,31 @@ extern "C" void do_montecarlo(int* md_pid,long *md_tatoms_cpu,long **md_atomnumb
     //          some energy computation as per ensemble definitions (to initiate acceptance flag!!)
     //*****************************************
 
+    // acceptance condition(here to be included)
 
     // reading updated configuration after simulation
-    read_update_config (accept_flag,sample_id,file_name,sam_particle,c_obj);
+    //read_update_config(accept_flag,sample_id, file_name ,sam_particle,c_obj);
+
+    // edited // read_update_config(sample_id, file_name ,sam_particle,c_obj);
 
     // fill mc container
-    fill_mc_container(c_obj);
+
+    // edited // fill_mc_container(c_obj);
 
     // clear created objects
 
-    for (long count=0; count < c_obj.get_ncells(); count++){
+    // edited //for (long count=0; count < c_obj.get_ncells(); count++){
         // clear all particles in cell
-    	c_obj.get_cell(count).clear_all_particles();
-    }
+    // edited //	c_obj.get_cell(count).clear_all_particles();
+    // edited // }
+
     // clear all cells in cellblock
-    c_obj.clear_all_cells();
+
+    // edited // c_obj.clear_all_cells();
 
 	// Data mirroring procedure - Assigning pointers
 
-	md_pid         = &mc_prank;              // process rank
+	md_pid         = mc_prank;              // process rank
 	md_tatoms_cpu  = &mc_tatoms_cpu;         // current total particles
 
 	// preliminary pointer assignment

@@ -1,16 +1,18 @@
-/****************************************************************************************
- *                                    Monte_classes.cpp
+/*
+ * Monte_new_classes.cpp
  *
- *                    class definitions for Montecarlo
- *****************************************************************************************/
+ *  Created on: Mar 6, 2015
+ *      Author: ganeshfx
+ */
 
 
-#include "Monte_classes.h"
+#include "Monte_new_classes.h"
 
 using namespace std;
 
 // particle class
 // constructor declaration
+
 particle::particle(void){
 	mytype     = 0;
 	mynumber   = 0;
@@ -19,6 +21,7 @@ particle::particle(void){
 	myposition = {0.0,0.0,0.0};
 	myvelocity = {0.0,0.0,0.0};
 }
+
 
 // class method declaration
 void particle::set_mytype(int type)         { mytype = type;  }
@@ -45,29 +48,20 @@ celltype::celltype(void){
 	      lcoord      = {0,0,0};
 	      gcoord      = {0,0,0};
 	      sample_fact = 0;
+	      particle_counter = 0;
 }
+
 void celltype::set_cell_id(int uid)                   {  cell_id = uid ; }
 void celltype::set_glob_coord(ivec3d cell_gcoord)     {  gcoord = cell_gcoord; }
 void celltype::set_loc_coord(ivec3d cell_lcoord)      {  lcoord = cell_lcoord; }
 void celltype::add_neighbor(int id, ivec3d position)  {  nbl_list[id] = position; } // nbl asssignments
 void celltype::add_sample(void)                       {  sample_fact += 1;        }
-
-//void cellblock::set_x_min(int val){      x_min = val;}
-//void cellblock::set_x_max(int val){    x_max = val;  }
-//void cellblock::set_y_min(int val){    y_min = val;  }
-//void cellblock::set_y_max(int val){    y_max = val;  }
-//void cellblock::set_z_min(int val){    y_min = val;  }
-//void cellblock::set_z_max(int val){    y_max = val;  }
+void celltype::update_particle_counter(void)        {  particle_counter += 1; }
 
 
 // class cellblock methods
-//cellblock::cellblock(void){
-//	  ncells = 0;
-	  //mycpu  = 0;
-//}
-
-// class cellblock methods
-void cellblock::set_mycpu(int cpuid){	mycpu = cpuid;}
+void cellblock::set_mycpu(int cpuid)                  {	mycpu = cpuid;}
+void cellblock::set_ncells(int cell_count)            { ncells = cell_count;}
 
 celltype cellblock::cell_with_lcoord(ivec3d lcoord, long ncells){
 
@@ -88,3 +82,5 @@ celltype cellblock::cell_with_lcoord(ivec3d lcoord, long ncells){
 	}
 	return target;
 }
+
+

@@ -286,9 +286,13 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int accept_flag = 0; // acceptance flag
 
+	int dbug_flag = 1;   // debug flag -- print check statements
+
+
+
 	// creating cellblock object
 
-	cellblock c_obj, r_cell,r_partic;
+	cellblock c_obj, r_cell,r_partic, r_vel;
 	double tbox_dim[9];
 
 	// CPU box dimension
@@ -339,7 +343,17 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 
     r_partic = make_particles(r_cell,mc_tatoms_cpu, tbox_dim, mc_global_cell_dim,cpu_gcoord,mc_cpu_cell_dim,
-        		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot,mc_prank);
+        		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot,mc_prank,dbug_flag);
+
+
+    // clear STL container (once particle objects are created)
+
+    // (NOT REQUIRED DURING TESTING PHASE -- INCLUDE LATER -- in sync with fill_mc_container)
+//	       mc_atomnumber.clear();
+//	       mc_atomtypes.clear();
+//         mc_atommass.clear();
+//         mc_positions.clear();
+//         mc_epot.clear();
 
 
     if(mc_prank == 0) {
@@ -352,31 +366,38 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     	     tot_particles += r_partic.get_cell(i).get_nparticles();
 
         }
-        cout << " Total particles allocated in CPU 0 " << tot_particles << endl;
+        cout << " Total particles allocated after MAKE CELLS in CPU 0 " << tot_particles << endl;
         cout << "****************************************************" << endl;
     }
 
 
     // create velocities (T != 0K)
-	// edited //if(!mc_temp) create_maxwell_velocities(c_obj,mc_temp,mc_restriction);
+	if(mc_temp>0){
+		r_vel = create_maxwell_velocities(r_partic,mc_temp,mc_restriction,mc_prank,dbug_flag);
+		r_partic = r_vel;
+	}
 
 
-    //**************************************************************
-    //!!!!!!!!!!!!!!!!!!!!!!!!!! check if required
-    //**************************************************************
+    if(mc_prank == 0) {
 
-    //    select random cell ex: cell-0 // for moving window cell after cell
-    //    celltype cell_obj = c_obj.get_cell(0);
+    	long tot_particles=0; // check variable
+        cout << "****************************************************" << endl;
 
-    // construct neighbor list for chosen cell
-    //    make_mc_nblist(cell_obj);
+        for(int i=0; i<r_vel.get_cell_list_size(); i++){
+    	     //cout << " No of particles in cell id  [ " << i << " ] : "<< r_partic.get_cell(i).get_nparticles()  << endl;
+    	     tot_particles += r_vel.get_cell(i).get_nparticles();
+
+        }
+        cout << " Total particles allocated after VELOCITY COMPUTATION in CPU 0 " << tot_particles << endl;
+        cout << "****************************************************" << endl;
+    }
 
     // sample window id(Hard coded for window 0)
     // extend the fragment with random selector
 
     int sample_id= 0;
-    // particle instance
 
+    // particle instance
     // edited // particle sam_particle = sample_zone(c_obj,sample_id);
 
 

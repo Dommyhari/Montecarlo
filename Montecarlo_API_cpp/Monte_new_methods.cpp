@@ -309,9 +309,9 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 } // make_cells
 
 
-
+// Tested
 cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
-		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank){
+		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank,int debug){
 
      // method for creating particle objects and fill in cell container
 
@@ -383,7 +383,6 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, i
  		 ivec3d cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact,cpu_cell_dim);
 
  		 // to get memory index of cell in cell list
-
  		 cell_index = cell_loc_coord.x + (cell_loc_coord.y * cpu_cell_dim.x) + (cell_loc_coord.z * cpu_cell_dim.y * cpu_cell_dim.x);
 
 
@@ -395,47 +394,220 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, i
 
  		 cell0.add_particle(atom);
 
-         loc_obj.set_cell(cell0,cell_index);
+         loc_obj.set_cell(cell0,cell_index);  // update cell object with included particle
 
-//       loc_obj.get_cell(cell_index).add_particle(atom,cell_index);
+         if (debug == 1){
 
+        	   if((prank == 0) &&  (cell_index==100) && (l_counter == 0)){
 
-         if((prank == 0) &&  (cell_index==100) && (l_counter == 0)){
-             cout << "  Super check: Inside make particles " << endl;
-             cout << "  cell index  : " << cell_index << endl;
-             cout << "  cell size :  " <<  loc_obj.get_cell(cell_index).get_nparticles() << endl;
-             cout << "  my no :" << loc_obj.get_cell(cell_index).get_particle(0).get_mynumber() << endl;
-    	     cout << "  my type :" << loc_obj.get_cell(cell_index).get_particle(0).get_mytype() << endl;
-        	 cout << "  my mass :" << loc_obj.get_cell(cell_index).get_particle(0).get_mymass() << endl;
-        	 cout << "  my pos:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().x << endl;
-        	 cout << "  my pos:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().y << endl;
-        	 cout << "  my pos:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().z << endl;
-    	     cout << "  epot      "<< loc_obj.get_cell(cell_index).get_particle(0).get_myepot() << endl;
+        		         cout << "  Super check: Inside make particles " << endl;
+                         cout << "  cell index  : " << cell_index << endl;
+                         cout << "  cell size :  " <<  loc_obj.get_cell(cell_index).get_nparticles() << endl;
+                         cout << "  my no :" << loc_obj.get_cell(cell_index).get_particle(0).get_mynumber() << endl;
+    	                 cout << "  my type :" << loc_obj.get_cell(cell_index).get_particle(0).get_mytype() << endl;
+        	             cout << "  my mass :" << loc_obj.get_cell(cell_index).get_particle(0).get_mymass() << endl;
+        	             cout << "  my pos:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().x << endl;
+        	             cout << "  my pos:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().y << endl;
+        	             cout << "  my pos:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().z << endl;
+    	                 cout << "  epot      "<< loc_obj.get_cell(cell_index).get_particle(0).get_myepot() << endl;
 
-    	     l_counter++;
-
-          }
-
+    	                 l_counter++;
+           }
+         }
 
  		 }// end of for loop
 
 	     // returning updated cellblock
 	     ret_obj = loc_obj;
 
-	     // clear STL container (once particle objects are created)
-
-	     // (NOT REQUIRED DURING TESTING PHASE -- INCLUDE LATER -- in sync with fill_mc_container)
-//	       mc_atomnumber.clear();
-//	       mc_atomtypes.clear();
-//         mc_atommass.clear();
-//         mc_positions.clear();
-//         mc_epot.clear();
-
 	     return ret_obj;
 
 } //make particles
 
 
+cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  restriction, int prank,int debug){
+
+	 //     this code fragment/logic is inspired and inherited from IMD- imd_maxwell.c
+	 //     the impulse computation is re-implemented in terms of velocity .(velocity = impulse/mass)
+
+	  cellblock ret_obj;
+
+	  //   create and fill initial velocities for particles
+
+      double vx,vy,vz;                      // velocity holders
+      double imp_x,imp_y,imp_z;             // impulse holders
+      double sum_x, sum_y, sum_z;           // sum holders
+      double rtemp;                         // reduced temp variable
+
+      int   dof_x,dof_y,dof_z;               // degrees of freedom holders
+      long  tot_dof_x,tot_dof_y,tot_dof_z ;
+
+      long cell_count = loc_obj.get_cell_list_size(); // no of cells in cellblock
+      long particles_count = 0;
+      int mytype=0;
+      int cell_index=0, l_counter=0;
+
+      for(long i=0; i<cell_count; i++){ // loop over all cells
+
+    	  celltype cobj;
+    	  cobj = loc_obj.get_cell(i);
+
+    	  particles_count = cobj.get_nparticles();
+
+    	  //particles_count = loc_obj.get_cell(i).get_nparticles();
+
+    	  for(long j=0; j<particles_count; j++){ // loop over all particles
+
+        	  particle atom;
+
+        	  atom = cobj.get_particle(j);
+        	  mytype = atom.get_mytype();
+
+        	  dof_x  = restriction[mytype].x;
+        	  dof_y  = restriction[mytype].y;
+        	  dof_z  = restriction[mytype].z;
+
+        	  // reduced temp
+        	  rtemp = sqrt(atom.get_mymass() * temp);
+
+        	  imp_x = get_gaussian(rtemp) * dof_x ;
+        	  imp_y = get_gaussian(rtemp) * dof_y ;
+        	  imp_z = get_gaussian(rtemp) * dof_z ;
+
+        	  // initially storing impulse
+        	  atom.set_myvelocity(imp_x,imp_y,imp_z);
+
+        	  //update atom particle object
+              cobj.set_particle(atom,j);
+
+        	  // summing total dof
+        	  tot_dof_x += dof_x;
+        	  tot_dof_y += dof_y;
+        	  tot_dof_z += dof_z;
+
+        	  // summing total impulse
+        	  sum_x += imp_x;
+        	  sum_y += imp_y;
+        	  sum_z += imp_z;
+
+    	  } // loop particles -1
+
+    	  //update cell object
+    	  loc_obj.set_cell(cobj,i);
+
+      } // loop cells-1
+
+//	  sum_x = tot_dof_x == 0 ? 0.0 : sum_x / tot_dof_x;
+//	  sum_y = tot_dof_y == 0 ? 0.0 : sum_y / tot_dof_y;
+//	  sum_z = tot_dof_z == 0 ? 0.0 : sum_z / tot_dof_z;
+
+
+	  sum_x =  sum_x / tot_dof_x;
+	  sum_y =  sum_y / tot_dof_y;
+	  sum_z =  sum_z / tot_dof_z;
+
+      double new_vx,new_vy,new_vz;
+
+	  for(long i=0; i<cell_count; i++){ // loop over all cells
+
+    	  celltype cobj;
+    	  cobj = loc_obj.get_cell(i);
+    	  particles_count = cobj.get_nparticles();
+
+    	  //particles_count = loc_obj.get_cell(cell_count).get_nparticles();
+
+
+		  for(long j=0; j<particles_count; j++){ // loop over all particles
+
+        	  particle atom;
+        	  int mytype;
+        	  atom = cobj.get_particle(j);
+        	  mytype = atom.get_mytype();
+
+        	  dof_x  = restriction[mytype].x;
+        	  dof_y  = restriction[mytype].y;
+        	  dof_z  = restriction[mytype].z;
+
+        	  // new velocity computation
+
+        	  new_vx = atom.get_myvelocity().x - ( (sum_x /atom.get_mymass()) * dof_x ) ;
+        	  new_vy = atom.get_myvelocity().y - ( (sum_y /atom.get_mymass()) * dof_y ) ;
+        	  new_vz = atom.get_myvelocity().z - ( (sum_z /atom.get_mymass()) * dof_z ) ;
+
+
+//        	  new_vx = ((atom.get_myvelocity().x - sum_x )/atom.get_mymass()) * dof_x;
+//        	  new_vy = ((atom.get_myvelocity().y - sum_y )/atom.get_mymass()) * dof_y;
+//        	  new_vz = ((atom.get_myvelocity().z - sum_z )/atom.get_mymass()) * dof_z;
+
+        	  //updating velocity
+        	  atom.set_myvelocity(new_vx,new_vy,new_vz);
+
+        	  //update atom particle
+              cobj.set_particle(atom,j);
+
+		  } // loop particles -2
+
+    	  //update cell object
+    	  loc_obj.set_cell(cobj,i);
+
+          cell_index = i;
+
+          if((prank == 0) &&  (cell_index==100) && (l_counter == 0) && (debug==1)){
+
+         	  cout << "  Super check: create Maxwell velocities " << endl;
+              cout << "  cell index  : " << cell_index << endl;
+              cout << "  cell size :  " <<  loc_obj.get_cell(cell_index).get_nparticles() << endl;
+              cout << "  my no :" << loc_obj.get_cell(cell_index).get_particle(0).get_mynumber() << endl;
+     	      cout << "  my type :" << loc_obj.get_cell(cell_index).get_particle(0).get_mytype() << endl;
+         	  cout << "  my mass :" << loc_obj.get_cell(cell_index).get_particle(0).get_mymass() << endl;
+         	  cout << "  my pos:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().x << endl;
+         	  cout << "  my pos:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().y << endl;
+         	  cout << "  my pos:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().z << endl;
+              cout << "  my vel:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myvelocity().x << endl;
+              cout << "  my vel:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myvelocity().y << endl;
+              cout << "  my vel:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myvelocity().z << endl;
+         	  cout << "  epot      "<< loc_obj.get_cell(cell_index).get_particle(0).get_myepot() << endl;
+
+     	      l_counter++;
+          }
+
+	  } // loop cells -2
+
+
+	  //updating block object
+	  ret_obj = loc_obj;
+
+	  // check msg
+	  cout<<" initial velocities are computed for cpu id:"<< prank <<endl;
+
+	  return ret_obj;
+
+}
+
+double get_gaussian(double sigma){
+
+	      //     this code fragment/logic is inspired and inherited from IMD- imd_maxwell.c
+	      //     Polar (Box-Mueller) method; See Knuth v2, 3rd ed, p122
+
+		  double x, y, r2;
+
+		  do{
+		      /* choose x,y in uniform square (-1,-1) to (+1,+1) */
+			  // NOTE: c++ random generator to be updated check later
+
+		      x = -1 + 2 * drand48();
+		      y = -1 + 2 * drand48();
+
+		      /* see if it is in the unit circle */
+		      r2 = x * x + y * y;
+
+		  }while (r2 > 1.0 || r2 == 0);
+
+
+		  /* Box- Muller transform */
+		  return (double) (sigma * y * sqrt (-2.0 * log (r2) / r2));
+
+}
 
 // some utility methods
 

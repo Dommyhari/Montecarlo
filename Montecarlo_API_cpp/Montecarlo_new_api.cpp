@@ -282,10 +282,12 @@ extern "C" void pack_config_to_montecarlo(long md_mc_tatoms_cpu,long *md_mc_atom
 extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumber,int **md_atomtypes,
     		double **md_atommass,double **md_positions){
 
+	MPI_Barrier(comm_name); // for ordered printing
 
 	int accept_flag = 0; // acceptance flag
 
 	// creating cellblock object
+
 	cellblock c_obj, r_cell,r_partic;
 	double tbox_dim[9];
 
@@ -294,10 +296,11 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	cpu_box_diag.x = mc_cpu_box_x.x; cpu_box_diag.y = mc_cpu_box_y.y; cpu_box_diag.z = mc_cpu_box_z.z;
 
-	ncells_cpu = calc_ncells_cpu(cpu_box_diag,mc_cell_dim);
+	//ncells_cpu = calc_ncells_cpu(cpu_box_diag,mc_cell_dim);
 
 	c_obj.set_mycpu(mc_prank);
-	c_obj.set_ncells(ncells_cpu);
+
+	//c_obj.set_ncells(ncells_cpu);
 
 
 	// construct cells
@@ -306,23 +309,26 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	// check values
 
+	/*
 	if(mc_prank == 0){
-	   ivec3d check_cell_gc = r_cell.get_cell(0).get_cell_glob_coord();
-	   ivec3d check_cell_lc = r_cell.get_cell(0).get_cell_loc_coord();
+	   ivec3d check_cell_gc = r_cell.get_cell(100).get_cell_glob_coord();
+	   ivec3d check_cell_lc = r_cell.get_cell(100).get_cell_loc_coord();
 
        cout << "================================================" << endl;
 	   cout << "               From do_montecarlo after  make_cells             "  << endl;
 	   cout << "               cell block object check         "  << endl;
-	   cout << " ncells_cpu : " << ncells_cpu << endl;
+	   //cout << " ncells_cpu : " << ncells_cpu << endl;
 	   cout << "  c_obj.get_mycpu()       " << r_cell.get_mycpu() << endl;
-       cout << "  c_obj.get_ncells()      " << r_cell.get_ncells() << endl;
+       cout << "  c_obj.get_cell_list_size()      " << r_cell.get_cell_list_size() << endl;
 
-       cout << "    cell[0]     check     "  <<  endl;
+       cout << "    cell[100]     check     "  <<  endl;
 	   cout << "  cell glob coord : [  " << check_cell_gc.x<< " "<<check_cell_gc.y<<" "<<check_cell_gc.z<<" ]"<<endl;
 	   cout << "  cell loca coord : [  " << check_cell_lc.x<< " "<<check_cell_lc.y<<" "<<check_cell_lc.z<<" ]"<<endl;
        cout << "================================================" << endl;
 
 	}
+	*/
+
     // create particles
 	// edited //make_particles(c_obj);
 
@@ -332,173 +338,23 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 
 
-
     r_partic = make_particles(r_cell,mc_tatoms_cpu, tbox_dim, mc_global_cell_dim,cpu_gcoord,mc_cpu_cell_dim,
-    		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot);
+        		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot,mc_prank);
 
 
-    int l_counter = 0;
-    long m=0;
+    if(mc_prank == 0) {
 
+    	long tot_particles=0; // check variable
+        cout << "****************************************************" << endl;
 
+        for(int i=0; i<r_partic.get_cell_list_size(); i++){
+    	     //cout << " No of particles in cell id  [ " << i << " ] : "<< r_partic.get_cell(i).get_nparticles()  << endl;
+    	     tot_particles += r_partic.get_cell(i).get_nparticles();
 
-//    // local definition of make particles method
-//	for(long i=0;i<mc_tatoms_cpu;i++){
-//
-//		 particle atom;
-//
-//		 ivec3d cell_glob_coord;
-//	     double inst_pos[3];
-//
-//
-//
-//		 atom.set_mynumber(mc_atomnumber.at(i));
-//		 atom.set_mytype(mc_atomtypes.at(i));
-//
-//		 // counting particles
-//
-//		 // include later (March) (with in scope of Montecarlo_new_api.cpp)
-//
-// 		 if((mc_atomtypes.at(i)%mc_real_types) == 0) mc_real_cpu++;   // add real Fe particle
-// 		 if((mc_atomtypes.at(i)%mc_real_types) == 1) mc_carb_cpu++;   // add real C particle
-// 		 if((mc_atomtypes.at(i)%mc_real_types) == 2) mc_phold_cpu++;  // add placeholder particle
-//
-//
-//         atom.set_mymass(mc_atommass.at(i));
-//         // better split as position x,y & z
-//		 //atom.set_myposition(mc_positions.at(m++),mc_positions.at(m++),mc_positions.at(m++));
-//		 atom.set_myposition(mc_positions.at((i*3)+0),mc_positions.at((i*3)+1),mc_positions.at((i*3)+2));
-//
-//		 atom.set_myepot(mc_epot.at(i));
-//
-//		 // get global cell coordinate from particle position
-//		 inst_pos[0] = atom.get_myposition().x; inst_pos[1] = atom.get_myposition().y; inst_pos[2] = atom.get_myposition().z;
-//
-//
-//		 /*
-//         cout << "=========================================== " << endl;
-//
-//         cout << " Instantaneous position while passing" << endl;
-//         cout << "    Atom id set: "            << mc_atomnumber.at(i) << endl;
-//         cout << "    Atom id get: "            << atom.get_mynumber() << endl;
-//         cout << "   position vector  :     " << inst_pos[0] << " "<< inst_pos[1] << " "<<inst_pos[2]<< endl;
-//         cout << "=========================================== " << endl;
-//         */
-//
-//		 /*
-//		 if (i==0){
-//		      cout << "===================================================================================" << endl;
-//	          cout << "         Inside make_particles  check while reading and assigning              " << endl;
-//
-//		      cout << " particle 0 -- id   :" << atom.get_mynumber() << endl;
-//	          cout << " particle 0 -- type :" << atom.get_mytype() << endl;
-//	          cout << " particle 0 -- mass :" << atom.get_mymass() << endl;
-//	          cout << " particle 0 -- pos_x :" << atom.get_myposition().x << endl;
-//	          cout << " particle 0 -- pos_y :" << atom.get_myposition().y << endl;
-//	          cout << " particle 0 -- pos_z :" << atom.get_myposition().z << endl;
-//	          cout  << " particle 0 -- epot  :" << atom.get_myepot() << endl;
-//
-//	          cout << "===================================================================================" << endl;
-//
-//		 }
-//         */
-//
-//	     cell_glob_coord = cell_coordinate(inst_pos,tbox_dim,mc_global_cell_dim);
-//
-//
-//	     //cout<< "  DEBUG :cell_glob_coord :   "<< cell_glob_coord.x<<" "<<cell_glob_coord.y<<" "<<cell_glob_coord.z<<endl;
-//
-//	     ivec3d cpu_fact = cpu_gcoord;
-//
-//		 // get cell local coordinate
-//		 ivec3d cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact,mc_cpu_cell_dim);
-//
-//
-//
-//		 // to get memory index of cell in cell list
-//		 //int cell_index = cell_loc_coord.x + (cell_loc_coord.y * cpu_cell_dim.x) + (cell_loc_coord.z * cpu_cell_dim.x * cpu_cell_dim.x);
-//
-//         long count = r_cell.get_ncells();
-//
-//         //cout << " no of cells count inside block : " << count << endl;
-//
-//         int cell_index = r_cell.cell_with_lcoord(cell_loc_coord,count).get_cell_id();
-//
-//         //cout << " cell_index computed : " << cell_index << endl;
-//
-//        // add particle
-//
-//		 r_cell.get_cell(cell_index).add_particle(atom);
-//
-//		 cout<<"==================================================="<<endl;
-//    	 cout << " Add particle check " << endl;
-//    	 cout << "  cell index : " << cell_index << endl;
-//    	 cout << " no of particles in cell " << r_cell.get_cell(cell_index).get_nparticles()<< endl;
-//	     cout << " Assigned particle check   " << endl;
-//	     cout<<"==================================================="<<endl;
-//
-//
-//         /*
-//         if ((cell_index == 247) && (l_counter == 0) ){
-//       	    cout << " Add particle check " << endl;
-//       	    cout << " no of particles in cell " << r_cell.get_cell(cell_index).get_nparticles()<< endl;
-//   	        cout << " Assigned particle check   " << endl;
-//
-//
-////   	        cout << "  my no :" << r_cell.get_cell(cell_index).get_particle(0).get_mynumber() << endl;
-////   	        cout << "  my type :" << r_cell.get_cell(cell_index).get_particle(0).get_mytype() << endl;
-////   	        cout << "  my mass :" << r_cell.get_cell(cell_index).get_particle(0).get_mymass() << endl;
-////   	        cout << "  my pos:x " << r_cell.get_cell(cell_index).get_particle(0).get_myposition().x << endl;
-////   	        cout << "  my pos:y " << r_cell.get_cell(cell_index).get_particle(0).get_myposition().y << endl;
-////   	        cout << "  my pos:z " << r_cell.get_cell(cell_index).get_particle(0).get_myposition().z << endl;
-////   	        cout << "  epot      "<< r_cell.get_cell(cell_index).get_particle(0).get_myepot() << endl;
-//
-//   	        l_counter++;
-//         }
-//         */
-//
-//    } // end of particles loop
-
-
-    /*
-    if(mc_prank == 0){
-
-		cout << " particles count check " << endl;
-		cout << " no of Fe particles    " << mc_real_cpu << endl;
-		cout << " no of C particles    "  << mc_carb_cpu << endl;
-		cout << " no of placeholders    " << mc_phold_cpu<< endl;
-
-	}
-    */
-
-
-
-    /*
-	ivec3d check_partic_gc = r_partic.get_cell(100).get_cell_glob_coord();
-	ivec3d check_partic_lc = r_partic.get_cell(100).get_cell_loc_coord();
-
-	cout << "================================================" << endl;
-	cout << "               From do_montecarlo after make_particles     "  << endl;
-	cout << "               cell block object check         "  << endl;
-    cout << " no of particles in cell 100 :" << r_partic.get_cell(100).get_nparticles() << endl;
-    cout << "                particle attribute check        " << endl;
-    cout << "    cell[100]     check     "  <<  endl;
-	cout << "  cell glob coord : [  " << check_partic_gc.x<< " "<<check_partic_gc.y<<" "<<check_partic_gc.z<<" ]"<<endl;
-	cout << "  cell loca coord : [  " << check_partic_lc.x<< " "<<check_partic_lc.y<<" "<<check_partic_lc.z<<" ]"<<endl;
-	cout << "================================================" << endl;
-
-	*/
-
-//    cout << " particle 0 -- id   :" << r_partic.get_cell(0).get_particle(0).get_mynumber() << endl;
-//    cout << " particle 0 -- type :" << r_partic.get_cell(0).get_particle(0).get_mytype() << endl;
-//    cout << " particle 0 -- mass :" << r_partic.get_cell(0).get_particle(0).get_mymass() << endl;
-//    cout << " particle 0 -- pos_x :" << r_partic.get_cell(0).get_particle(0).get_myposition().x << endl;
-//    cout << " particle 0 -- pos_y :" << r_partic.get_cell(0).get_particle(0).get_myposition().y << endl;
-//    cout << " particle 0 -- pos_z :" << r_partic.get_cell(0).get_particle(0).get_myposition().z << endl;
-//    cout << " particle 0 -- epot  :" << r_partic.get_cell(0).get_particle(0).get_myepot() << endl;
-
-    cout << "================================================" << endl;
-
+        }
+        cout << " Total particles allocated in CPU 0 " << tot_particles << endl;
+        cout << "****************************************************" << endl;
+    }
 
 
     // create velocities (T != 0K)
@@ -567,6 +423,8 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     *md_atomtypes  = mc_atomtypes.data();    // atom types
 	*md_atommass   = mc_atommass.data();     // atom mass
     *md_positions  = mc_positions.data();    // atom positions
+
+    MPI_Barrier(comm_name); // for ordered printing
 
 }
 

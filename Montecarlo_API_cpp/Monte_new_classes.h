@@ -51,7 +51,7 @@ class particle{
 
     public:
 	   // list of set functions definitions
-       particle();
+       //particle();
 	   void set_mynumber(long myno);
        void set_mytype(int type);
 	   void set_mymass(double mass);
@@ -83,7 +83,7 @@ class celltype{
 
     public:
 
-	    celltype();
+	    //celltype();
        	// set methods definition
 	    void set_cell_id(int uid);
         void set_glob_coord(ivec3d cell_gcoord);
@@ -93,14 +93,9 @@ class celltype{
         void add_neighbor(int id, ivec3d position);
         void add_sample(void);   // sample frequency counter
 
-        void add_particle(particle p,long cell_ind){
-        	//cell.at(ind) = p;
-        	//cout << " inside add particle " << endl;
-        	//cout << " cell_index  : " << cell_ind << endl;
-        	//cout << " particle id : " << p.get_mynumber() << endl;
+        void add_particle(particle p)     {  cell.push_back(p); }
 
-        	cell.push_back(p); }
-
+        void set_particle(particle p,long cell_ind)     {  cell.at(cell_ind)=p;}
 
         // for performance make manipulations
         void delete_particle(particle p, int index)    { cell.erase(cell.begin()+ index);}
@@ -125,7 +120,6 @@ class celltype{
 
 class cellblock{
 
-	int ncells;                                    // total no of cells
 	int mycpu;                                      // my cpu id
 	vector<celltype> cell_list;                     // container of cells
 
@@ -133,14 +127,15 @@ class cellblock{
 
         //CFR
 	    void set_mycpu(int cpuid);
-        void set_ncells(int cell_count);
 
         // set methods
 	    void add_cell(celltype ct)                        { cell_list.push_back(ct);}
 	    void delete_cell(int index)                      { cell_list.erase(cell_list.begin() + index);}
 
+	    void set_cell(celltype ct, int index)				{ cell_list.at(index) = ct;}
+
 	    // get methods
-	    int get_ncells()                                  { return ncells;}      // total no cells in block
+
 	    int get_cell_list_size()                         { return cell_list.size();}
 	    int get_mycpu()                                   { return mycpu; }                // my cpu id
 

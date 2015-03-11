@@ -210,8 +210,7 @@ ivec3d cell_coordinate(double* pos,double* tbox,ivec3d global_cell_dim){
   return coord;
 }
 
-
-
+// Tested
 cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d gcoord,ivec3d cpu_cell_dim, int prank){
 
     //    method for creating cell objects and fill in cellblock container
@@ -222,16 +221,18 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
 	cellblock ret_obj;
 
+	int line_counter=0;
+
 	//  (could be hardcoded for Moving window approach as nxn )
 
-	int ncells_tot    = loc_obj.get_ncells();
+	//int ncells_tot    = loc_obj.get_ncells();
 
 	cell_total = calc_cpu_cell_division(cpu_box_diag,cell_dim);
 
 
-	int stack_total   = cell_total.x;
+	int col_total     = cell_total.x;
 	int row_total     = cell_total.y;
-	int col_total     = cell_total.z;
+	int stack_total   = cell_total.z;
 
     ivec3d cell_gcoord = {0,0,0}; // initialization of cell global coordinate
     ivec3d cell_lcoord = {0,0,0}; // initialization of cell local coordinate
@@ -246,16 +247,19 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
     // loop over stack
 
-	for (int stack_no=0; stack_no<stack_total; stack_no++){
+
+	for (int col_count=0; col_count<col_total; col_count++){
 
 		for(int row_count=0; row_count<row_total; row_count++){
 
-			for(int col_count=0; col_count<col_total; col_count++){
+			for(int stack_no=0; stack_no<stack_total; stack_no++){
 
 				  celltype cell_obj;
 
                   // cell id computation
-        		  cell_no = cell_counter + ( ncells_tot * prank ); // cell id computation
+        		  //cell_no = cell_counter + ( ncells_tot * prank ); // cell id computation
+
+				  cell_no = cell_counter; // cell id computation
 
         		  // numbering sequence: x--> y --> z
 
@@ -284,8 +288,21 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
 	}//stack loop
 
-	ret_obj = loc_obj;
+    cout << " ========================================================================" << endl;
+    cout << " my process id :  " << prank << endl;
+    cout << " CPU coordinate  : " << gcoord.x <<" " << gcoord.y <<" "<<gcoord.z <<" "<< endl;
+    cout << " Cell allocation check :  no of cells  :  " <<  loc_obj.get_cell_list_size() << endl;
+    cout << " cell ID :" << loc_obj.get_cell(cell_no).get_cell_id();
+    cout << "   cell global coordinate        "<< loc_obj.get_cell(cell_no).get_cell_glob_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().y
+      		  <<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().z<<endl;
+    cout << "   cell local coordinate        "<< loc_obj.get_cell(cell_no).get_cell_loc_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().y
+      		  <<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().z<<endl;
+    cout << " ========================================================================" << endl;
 
+
+
+
+	ret_obj = loc_obj;
 
 	return ret_obj;
 
@@ -294,7 +311,7 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
 
 cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
-		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot){
+		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank){
 
      // method for creating particle objects and fill in cell container
 
@@ -308,16 +325,27 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, i
      double inst_pos[3];
      cellblock ret_obj;
 
+     int n_counter = 0;
      int l_counter = 0;
 
+     int cell_index = 0;
+
+     long total_cells = loc_obj.get_cell_list_size();
 
 	 for(long i=0;i<tatoms_cpu;i++){
 
 		 particle atom;
 
-
+		 // assigning particle attributes
 		 atom.set_mynumber(atomnumber.at(i));
  		 atom.set_mytype(atomtypes.at(i));
+         atom.set_mymass(atommass.at(i));
+         // better split as position x,y & z
+         atom.set_myposition(positions.at((i*3)+0),positions.at((i*3)+1),positions.at((i*3)+2));
+ 		 atom.set_myepot(epot.at(i));
+
+ 		 // get global cell coordinate from particle position
+ 		 inst_pos[0] = positions.at((i*3)+0); inst_pos[1] = positions.at((i*3)+1); inst_pos[2] = positions.at((i*3)+2);
 
  		 // counting particles
 
@@ -327,14 +355,6 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, i
 // 		 if((mc_atomtypes.at(i)%mc_real_types) == 1) mc_carb_cpu++;   // add real C particle
 // 		 if((mc_atomtypes.at(i)%mc_real_types) == 2) mc_phold_cpu++;  // add placeholder particle
 
-
-         atom.set_mymass(atommass.at(i));
-         // better split as position x,y & z
-         atom.set_myposition(positions.at((i*3)+0),positions.at((i*3)+1),positions.at((i*3)+2));
- 		 atom.set_myepot(epot.at(i));
-
- 		 // get global cell coordinate from particle position
- 		 inst_pos[0] = positions.at((i*3)+0); inst_pos[1] = positions.at((i*3)+1); inst_pos[2] = positions.at((i*3)+2);
 
          /*
  		 if (i==0){
@@ -363,48 +383,48 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, i
  		 ivec3d cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact,cpu_cell_dim);
 
  		 // to get memory index of cell in cell list
- 		 int cell_index = cell_loc_coord.x + (cell_loc_coord.y * cpu_cell_dim.x) + (cell_loc_coord.z * cpu_cell_dim.x * cpu_cell_dim.x);
+
+ 		 cell_index = cell_loc_coord.x + (cell_loc_coord.y * cpu_cell_dim.x) + (cell_loc_coord.z * cpu_cell_dim.y * cpu_cell_dim.x);
 
 
-         //int cell_index = loc_obj.cell_with_lcoord(cell_loc_coord,loc_obj.get_ncells()).get_cell_id();
+ 		 //int cell_index = loc_obj.cell_with_lcoord(cell_loc_coord,total_cells).get_cell_id(); // expensive!!!!
+
+      	 // just for testing add all particles to cell 1
+
+ 		 celltype cell0 = loc_obj.get_cell(cell_index);
+
+ 		 cell0.add_particle(atom);
+
+         loc_obj.set_cell(cell0,cell_index);
+
+//       loc_obj.get_cell(cell_index).add_particle(atom,cell_index);
 
 
-         // add particle
-         part_counter = loc_obj.get_cell(cell_index).get_particle_counter(); // get index / particle counter
+         if((prank == 0) &&  (cell_index==100) && (l_counter == 0)){
+             cout << "  Super check: Inside make particles " << endl;
+             cout << "  cell index  : " << cell_index << endl;
+             cout << "  cell size :  " <<  loc_obj.get_cell(cell_index).get_nparticles() << endl;
+             cout << "  my no :" << loc_obj.get_cell(cell_index).get_particle(0).get_mynumber() << endl;
+    	     cout << "  my type :" << loc_obj.get_cell(cell_index).get_particle(0).get_mytype() << endl;
+        	 cout << "  my mass :" << loc_obj.get_cell(cell_index).get_particle(0).get_mymass() << endl;
+        	 cout << "  my pos:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().x << endl;
+        	 cout << "  my pos:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().y << endl;
+        	 cout << "  my pos:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().z << endl;
+    	     cout << "  epot      "<< loc_obj.get_cell(cell_index).get_particle(0).get_myepot() << endl;
 
-         loc_obj.get_cell(cell_index).add_particle(atom,cell_index);
+    	     l_counter++;
 
-         // update particle counter
-         loc_obj.get_cell(cell_index).update_particle_counter();
-
-
-         if((cell_index==100) && (l_counter == 0)){
-             cout << "  Inside make particles " << endl;
-             cout << "  cell size :  " <<  loc_obj.get_cell(100).get_nparticles() << endl;
-             l_counter++;
-
-//             cout << "  my no :" << loc_obj.get_cell(100).get_particle(0).get_mynumber() << endl;
-//    	     cout << "  my type :" << loc_obj.get_cell(100).get_particle(0).get_mytype() << endl;
-//        	 cout << "  my mass :" << loc_obj.get_cell(100).get_particle(0).get_mymass() << endl;
-//        	 cout << "  my pos:x " << loc_obj.get_cell(100).get_particle(0).get_myposition().x << endl;
-//        	 cout << "  my pos:y " << loc_obj.get_cell(100).get_particle(0).get_myposition().y << endl;
-//        	 cout << "  my pos:z " << loc_obj.get_cell(100).get_particle(0).get_myposition().z << endl;
-//    	     cout << "  epot      "<< loc_obj.get_cell(100).get_particle(0).get_myepot() << endl;
-
-           }
-
+          }
 
 
  		 }// end of for loop
-
-
 
 	     // returning updated cellblock
 	     ret_obj = loc_obj;
 
 	     // clear STL container (once particle objects are created)
 
-	     // (NOT REQUIRED DURING TESTING PHASE -- INCLUDE LATER)
+	     // (NOT REQUIRED DURING TESTING PHASE -- INCLUDE LATER -- in sync with fill_mc_container)
 //	       mc_atomnumber.clear();
 //	       mc_atomtypes.clear();
 //         mc_atommass.clear();

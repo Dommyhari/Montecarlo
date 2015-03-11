@@ -13,6 +13,7 @@ using namespace std;
 // particle class
 // constructor declaration
 
+/*
 particle::particle(void){
 	mytype     = 0;
 	mynumber   = 0;
@@ -21,7 +22,7 @@ particle::particle(void){
 	myposition = {0.0,0.0,0.0};
 	myvelocity = {0.0,0.0,0.0};
 }
-
+*/
 
 // class method declaration
 void particle::set_mytype(int type)         { mytype = type;  }
@@ -41,7 +42,7 @@ void particle::set_myvelocity(double v_x,double v_y,double v_z){
 
 
 // class celltype methods
-
+/*
 celltype::celltype(void){
 	      cell_id     = 0;
 	      nparticles  = 0;
@@ -51,6 +52,7 @@ celltype::celltype(void){
 	      particle_counter = 0;
 }
 
+*/
 void celltype::set_cell_id(int uid)                   {  cell_id = uid ; }
 void celltype::set_glob_coord(ivec3d cell_gcoord)     {  gcoord = cell_gcoord; }
 void celltype::set_loc_coord(ivec3d cell_lcoord)      {  lcoord = cell_lcoord; }
@@ -61,7 +63,6 @@ void celltype::update_particle_counter(void)        {  particle_counter += 1; }
 
 // class cellblock methods
 void cellblock::set_mycpu(int cpuid)                  {	mycpu = cpuid;}
-void cellblock::set_ncells(int cell_count)            { ncells = cell_count;}
 
 celltype cellblock::cell_with_lcoord(ivec3d lcoord, long ncells){
 

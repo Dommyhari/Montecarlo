@@ -110,59 +110,34 @@ vec3d mc_tbox_x,mc_tbox_y,mc_tbox_z;                                  // mc_tran
 //:  calc_cell_dim(rsample)
 vec3d mc_cell_dim;                                                    // cell dimensions for MC                                 MC
 
-
-// windows sampler
-
-// all possible window neighbors
-
-int windows_count = 8;  // Dnote: holds for earlier implementation (to be extended later)
-
 // Energy computation for acceptance condition
 
 double energy_ref;
 double energy_new;
 
 
-// possible neighbor index as per window location
+//// possible neighbor index as per window location
+//
+//int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
+//int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
+//int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
+//
+//// windows position
+//
+//ivec3d win_pos_0 = {0,0,0};
+//ivec3d win_pos_1 = {0,0,1};
+//ivec3d win_pos_2 = {1,0,0};
+//ivec3d win_pos_3 = {1,0,1};
+//ivec3d win_pos_4 = {0,1,0};
+//ivec3d win_pos_5 = {0,1,1};
+//ivec3d win_pos_6 = {1,1,0};
+//ivec3d win_pos_7 = {1,1,1};
+//
+//ivec3d window_position[8]={win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
 
-int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
-int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
-int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
-
-
-// sample cell ranges (HARDCODED FOR 8 CENTRAL CELLS)
-ivec6d zone_limit_0 = {0,1,0,1,0,1}; // window 0
-ivec6d zone_limit_1 = {0,1,0,1,1,2}; // window 1
-ivec6d zone_limit_2 = {1,2,0,1,0,1}; // window 2
-ivec6d zone_limit_3 = {1,2,0,1,1,2}; // window 3
-ivec6d zone_limit_4 = {0,1,1,2,0,1}; // window 4
-ivec6d zone_limit_5 = {0,1,1,2,1,2}; // window 5
-ivec6d zone_limit_6 = {1,2,1,2,0,1}; // window 6
-ivec6d zone_limit_7 = {1,2,1,2,1,2}; // window 7
-
-ivec6d zone_limit[8]={zone_limit_0,zone_limit_1,zone_limit_2,zone_limit_3,zone_limit_4,zone_limit_5,zone_limit_6,zone_limit_7};
-
-// windows position
-
-ivec3d win_pos_0 = {0,0,0};
-ivec3d win_pos_1 = {0,0,1};
-ivec3d win_pos_2 = {1,0,0};
-ivec3d win_pos_3 = {1,0,1};
-ivec3d win_pos_4 = {0,1,0};
-ivec3d win_pos_5 = {0,1,1};
-ivec3d win_pos_6 = {1,1,0};
-ivec3d win_pos_7 = {1,1,1};
-
-ivec3d window_position[8]={win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
 
 // some MPI information (NEED ALLOCATION)
 long buffer_size; // total no of particles + threshold value
-
-//to be included suitable declaration to assign the following quantities
-
-//int stack_total;  // total no of stacks
-//int row_total ;   // total no of row
-//int col_total;    // total no of cols
 
 
 int ncells_cpu;   // no of cells per cpu

@@ -288,17 +288,18 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
 	}//stack loop
 
-    cout << " ========================================================================" << endl;
-    cout << " my process id :  " << prank << endl;
-    cout << " CPU coordinate  : " << gcoord.x <<" " << gcoord.y <<" "<<gcoord.z <<" "<< endl;
-    cout << " Cell allocation check :  no of cells  :  " <<  loc_obj.get_cell_list_size() << endl;
-    cout << " cell ID :" << loc_obj.get_cell(cell_no).get_cell_id();
-    cout << "   cell global coordinate        "<< loc_obj.get_cell(cell_no).get_cell_glob_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().y
+    if(prank == 0) {
+      cout << " ========================================================================" << endl;
+      cout << " my process id :  " << prank << endl;
+      cout << " CPU coordinate  : " << gcoord.x <<" " << gcoord.y <<" "<<gcoord.z <<" "<< endl;
+      cout << " Cell allocation check :  no of cells  :  " <<  loc_obj.get_cell_list_size() << endl;
+      cout << " cell ID :" << loc_obj.get_cell(cell_no).get_cell_id();
+      cout << "   cell global coordinate        "<< loc_obj.get_cell(cell_no).get_cell_glob_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().y
       		  <<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().z<<endl;
-    cout << "   cell local coordinate        "<< loc_obj.get_cell(cell_no).get_cell_loc_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().y
+      cout << "   cell local coordinate        "<< loc_obj.get_cell(cell_no).get_cell_loc_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().y
       		  <<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().z<<endl;
-    cout << " ========================================================================" << endl;
-
+      cout << " ========================================================================" << endl;
+    }
 
 
 
@@ -424,7 +425,7 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, i
 
 } //make particles
 
-
+// Tested
 cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  restriction, int prank,int debug){
 
 	 //     this code fragment/logic is inspired and inherited from IMD- imd_maxwell.c
@@ -497,6 +498,7 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
 
       } // loop cells-1
 
+      // this snippet has to be verified
 //	  sum_x = tot_dof_x == 0 ? 0.0 : sum_x / tot_dof_x;
 //	  sum_y = tot_dof_y == 0 ? 0.0 : sum_y / tot_dof_y;
 //	  sum_z = tot_dof_z == 0 ? 0.0 : sum_z / tot_dof_z;
@@ -583,7 +585,7 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
 	  return ret_obj;
 
 }
-
+// Tested
 double get_gaussian(double sigma){
 
 	      //     this code fragment/logic is inspired and inherited from IMD- imd_maxwell.c
@@ -608,6 +610,171 @@ double get_gaussian(double sigma){
 		  return (double) (sigma * y * sqrt (-2.0 * log (r2) / r2));
 
 }
+
+
+
+particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
+
+	celltype cobj;             // cell object
+
+	int sam_cell_counter = (cpu_cell_dim.x/2 * cpu_cell_dim.y/2 * cpu_cell_dim.z/2 );   // no of sample cells belonging to window
+	celltype sample_cells[sam_cell_counter];  // sample cells for given window type
+	long rand_no,n_particles;
+	particle atom;
+
+	// local cell coordinates zone
+    ivec3d test;
+    int count=0,rand_cell;
+    long ncells = bobj.get_cell_list_size();
+
+
+    // defining zone limits
+    int x_start=0,  x_mid = cpu_cell_dim.x/2,    x_end = cpu_cell_dim.x;   // zone limit parameters in x direction
+    int y_start=0,  y_mid = cpu_cell_dim.y/2,    y_end = cpu_cell_dim.y;   // zone limit parameters in y direction
+    int z_start=0,  z_mid = cpu_cell_dim.z/2,    z_end = cpu_cell_dim.z;   // zone limit parameters in z direction
+
+
+    // sample cell ranges
+    //ivec6d zone_limit_0 = {0,4,0,4,0,1}; // window 0
+
+    ivec6d zone_limit_0 = {x_start,x_mid-1,y_start,y_mid-1,z_start,z_mid-1}; // window 0
+    ivec6d zone_limit_1 = {x_start,x_mid-1,y_start,y_mid-1,z_mid,z_end-1};   // window 1
+    ivec6d zone_limit_2 = {x_mid,x_end-1,y_start,y_mid-1,z_start,z_mid-1};   // window 2
+    ivec6d zone_limit_3 = {x_mid,x_end-1,y_start,y_mid-1,z_mid,z_end-1};     // window 3
+
+    ivec6d zone_limit_4 = {x_start,x_mid-1,y_mid,y_end-1,z_start,z_mid-1}; // window 4
+    ivec6d zone_limit_5 = {x_start,x_mid-1,y_mid,y_end-1,z_mid,z_end-1};   // window 5
+    ivec6d zone_limit_6 = {x_mid,x_end-1,y_mid,y_end-1,z_start,z_mid-1};   // window 6
+    ivec6d zone_limit_7 = {x_mid,x_end-1,y_mid,y_end-1,z_mid,z_end-1};     // window 7
+
+
+    ivec6d zone_limit[8]={zone_limit_0,zone_limit_1,zone_limit_2,zone_limit_3,zone_limit_4,zone_limit_5,zone_limit_6,zone_limit_7};
+
+    // zone_limit: define sample window positions (x,y,z)
+
+    // prepare cell list as per sample window id
+
+    for(int i=zone_limit[win_id].xmin;i<=zone_limit[win_id].xmax;i++){
+    	for(int j=zone_limit[win_id].ymin;j<=zone_limit[win_id].ymax;j++){
+    		for(int k=zone_limit[win_id].zmin;k<=zone_limit[win_id].zmax;k++){
+
+    			test.x = i; test.y = j; test.z = k;
+    			sample_cells[count] = bobj.cell_with_lcoord(test,ncells);
+
+                count++;
+    		}
+    	}
+    }
+
+
+    if(prank == 0){
+
+    	cout << " %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << endl;
+    	cout << "---                Inside sample zone method                      ---------" << endl;
+    	cout << " My process CPU  : " << prank << endl;
+    	cout << " Chosen window position : " << win_id << endl;
+    	cout << " computed no of sample cell -- Sample_cell_counter : " << sam_cell_counter << endl;
+    	cout << " Included no of cells from loop counter :   " << count << endl;
+
+    	// print cell local coordinate and check??
+
+    	ivec3d loc_coord;
+
+    	cout << "=======================================================" << endl;
+    	cout << "                       sample cells check     "  << endl;
+    	cout << "=======================================================" << endl;
+    	for( int i=0; i<sam_cell_counter;i++){
+
+    		loc_coord = sample_cells[i].get_cell_loc_coord();
+    		cout << " sample cell id : " << i  << endl;
+    		cout << " sample cell local coordinate :  [ " <<loc_coord.x<<" "<<loc_coord.y<<" "<<loc_coord.z<<"  ]"<<endl;
+    		cout << " no of particles : " << sample_cells[i].get_nparticles() << endl;
+
+    	}
+
+
+    	cout << " %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << endl;
+
+    }
+
+    // choose one cell in random (belong to sample window)
+
+	rand_cell = rand()%sam_cell_counter;
+	cobj = sample_cells[rand_cell];
+
+	do{
+		//no of particles
+		n_particles= cobj.get_nparticles();
+		// choosing random placeholder
+		rand_no=(long) rand()%n_particles;
+	}while(cobj.get_particle(rand_no).get_mytype() !=2);
+
+	atom = cobj.get_particle(rand_no);
+
+	//--------------------- Unwanted replication - refer construct_sphere ---------------------//
+	// make change only in particle object instance
+	// swapping placeholder into carbon
+	// HC: hardcoded to 1
+    //atom.set_mytype(1);
+    //-----------------------------------------------------------------------------------------//
+
+    // construct sphere around selected particle and get the reference sphere before any trial move
+
+	//old_sphere_config = construct_sphere(atom,bobj,win_id,file_name);
+
+	return atom;
+}
+
+//celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name){
+//
+//	celltype sphere_old;
+//
+//	// possible neighbor index as per window location
+//
+//	int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
+//	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
+//	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
+//
+//	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
+//
+//	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
+//	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
+//
+//	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
+//
+//	// ==========================================================
+//	// Detect neighbor processes as per window position
+//	// ==========================================================
+//    // select neighbors as per sample window position
+//	int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
+//
+//	// send neighbors (to whom I send)        ---- process communications (in z direction)
+//	int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
+//
+//	// Receive neighbors (to whom I receive) ----- process communications (in z direction)
+//	int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
+//
+//    // send neighbors (to whom I send) -----  process communications (in x/y direction)
+//	int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
+//
+//	// Receive neighbors (to whom I send) -----  process communications (in x/y direction)
+//	int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
+//
+//	// get my process global coordinate
+//	ivec3d gcoord = get_cpu_gcoord(prank,comm_name);
+//	int x = gcoord.x; int y = gcoord.y; int z = gcoord.z;
+//
+//	// variables to store the position of selected particle on my CPU and neighbor CPU's
+//	// randomly selected particle positions (my CPU and rec_neighbor CPU)
+//
+//	double my_pos[3], rec_pos_0[3],rec_pos_1[3],rec_pos_2[3],rec_pos_3[3],rec_pos_4[3],rec_pos_5[3],rec_pos_6[3];
+//
+//	double* rec_pos[7]={rec_pos_0,rec_pos_1,rec_pos_2,rec_pos_3,rec_pos_4,rec_pos_5,rec_pos_6};
+//
+//	my_pos[0]=pobj.get_myposition().x; my_pos[1]=pobj.get_myposition().y; my_pos[2]=pobj.get_myposition().z;
+//
+//	return sphere_old;
+//}
 
 // some utility methods
 

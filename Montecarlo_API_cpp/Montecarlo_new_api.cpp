@@ -57,35 +57,6 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
     // process rank
     MPI_Comm_rank(comm_name, &mc_prank);
 
-
-    if(mc_prank == 0) {
-      	cout << "*****************************************************" << endl;
-    	cout << "             Values  pass  check   "  << endl;
-      	cout << " mc_tot_types :  " << mc_tot_types   << endl;
-      	cout << " mc_real_types : " << mc_real_types  << endl;
-      	cout << "*****************************************************" << endl;
-
-    }
-
-    if (mc_prank == 0) {
-      cout << "***********************************"<< endl;
-      cout << " Parameter passing check -- init_montecarlo (Montecarlo_new_api.cpp) " << endl;
-      cout << "***********************************"<< endl;
-      cout << "mc_CPU dimension [ :"<< mc_cpu_dim.x << mc_cpu_dim.y << mc_cpu_dim.z << "]" <<endl;
-      cout << " simbox dimension x : [" << mc_simbox_x.x << " "<<mc_simbox_x.y <<" "<< mc_simbox_x.z << " " << " ]" <<endl;
-      cout << " simbox dimension y : [" << mc_simbox_y.x << " "<<mc_simbox_y.y <<" "<< mc_simbox_y.z << " " << " ]" <<endl;
-      cout << " simbox dimension z : [" << mc_simbox_z.x << " "<<mc_simbox_z.y <<" "<< mc_simbox_z.z << " " << " ]" <<endl;
-
-      for(int i=0; i<mc_tot_types; i++){
-         	cout<<"Restriction [ "<<i<<" ] : "<<mc_restriction[i].x<<" "<<mc_restriction[i].y<<" "<<mc_restriction[i].z<<endl;
-      }
-      cout << " mc_temperature : " << mc_temp << endl;
-      cout << " mc_sweep_radii : " << mc_rsweep << endl;
-      cout << " wall thickness : " << mc_sphere_wall << endl;
-      cout << " random no : " << mc_sample_seed << endl;
-    }
-
-
     // compute Montecarlo cell dimension
 
     vec3d loc_cell_dim;
@@ -95,32 +66,11 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
 
     mc_cell_dim = calc_cell_dim(mc_rsweep,loc_cell_dim);
 
-    if (mc_prank == 0) {
-       cout << " ==================================="<<endl;
-       cout << " Montecarlo_new_api.cpp (calc_cell_dim -- after method call)    " << endl;
-       cout << " mc_cell_dim check " << endl;
-       cout << " mc_cell_dim.x    :  " <<  mc_cell_dim.x << endl;
-       cout << " mc_cell_dim.y    :  " <<  mc_cell_dim.y << endl;
-       cout << " mc_cell_dim.z    :  " <<  mc_cell_dim.z << endl;
-       cout << " ==================================="<<endl;
-    }
-
-
     // compute cpu box physical dimensions
 
     mc_cpu_box_x = calc_mc_cpu_box_vector(mc_simbox_x, mc_cpu_dim.x); // CPU box x vector
     mc_cpu_box_y = calc_mc_cpu_box_vector(mc_simbox_y, mc_cpu_dim.y); // CPU box y vector
     mc_cpu_box_z = calc_mc_cpu_box_vector(mc_simbox_z, mc_cpu_dim.z); // CPU box z vector
-
-    if (mc_prank == 0) {
-       cout << " ==================================="<<endl;
-       cout << " Montecarlo_new_api.cpp (calc_mc_cpu_box_vector -- after method call)    " << endl;
-       cout << " mc_cpu_box check " << endl;
-       cout << " mc_cpu_box_x    :  [ " <<  mc_cpu_box_x.x <<" "<<mc_cpu_box_x.y<<" "<<mc_cpu_box_x.z<<" "<<"]"<< endl;
-       cout << " mc_cpu_box_y    :  [ " <<  mc_cpu_box_y.x <<" "<<mc_cpu_box_y.y<<" "<<mc_cpu_box_y.z<<" "<<"]"<< endl;
-       cout << " mc_cpu_box_z    :  [ " <<  mc_cpu_box_z.x <<" "<<mc_cpu_box_z.y<<" "<<mc_cpu_box_z.z<<" "<<"]"<< endl;
-       cout << " ==================================="<<endl;
-    }
 
     // compute Tranformation box
 
@@ -134,30 +84,11 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
 
     mc_tbox_x = Tbox[0]; mc_tbox_y = Tbox[1]; mc_tbox_z = Tbox[2];
 
-    if (mc_prank == 0) {
-      cout << " ==================================="<<endl;
-      cout << " Montecarlo_new_api.cpp (make_mc_tbox_vector -- after method call)    " << endl;
-      cout << " mc_tbox check " << endl;
-      cout << " mc_tbox_x    :  [ " <<  mc_tbox_x.x <<" "<<mc_tbox_x.y<<" "<<mc_tbox_x.z<<" "<<"]"<< endl;
-      cout << " mc_tbox_y    :  [ " <<  mc_tbox_y.x <<" "<<mc_tbox_y.y<<" "<<mc_tbox_y.z<<" "<<"]"<< endl;
-      cout << " mc_tbox_z    :  [ " <<  mc_tbox_z.x <<" "<<mc_tbox_z.y<<" "<<mc_tbox_z.z<<" "<<"]"<< endl;
-      cout << " ==================================="<<endl;
-    }
 	// compute global cell array
     vec3d simbox_diag;
     simbox_diag.x = mc_simbox_x.x; simbox_diag.y = mc_simbox_y.y; simbox_diag.z = mc_simbox_z.z;
 
     mc_global_cell_dim = calc_mc_global_cell_array(simbox_diag,mc_cell_dim);
-
-    if (mc_prank == 0) {
-      cout << " ==================================="<<endl;
-      cout << " Montecarlo_new_api.cpp (calc_mc_global_cell_array -- after method call)    " << endl;
-      cout << " mc_global_cell_dim check " << endl;
-      cout << " mc_global_cell_dim.x    :  " <<  mc_global_cell_dim.x << endl;
-      cout << " mc_global_cell_dim.y    :  " <<  mc_global_cell_dim.y << endl;
-      cout << " mc_global_cell_dim.z    :  " <<  mc_global_cell_dim.z << endl;
-      cout << " ==================================="<<endl;
-    }
 
     // CPU cell array computation
     vec3d cpubox_diag;
@@ -165,28 +96,8 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
 
     mc_cpu_cell_dim = calc_mc_cpu_cell_array(cpubox_diag,mc_cell_dim, mc_cpu_dim,mc_global_cell_dim);
 
-    if (mc_prank == 0) {
-       cout << " ==================================="<<endl;
-       cout << " Montecarlo_new_api.cpp (calc_mc_cpu_cell_array -- after method call)    " << endl;
-       cout << " mc_cpu_cell_dim check " << endl;
-       cout << " mc_cpu_cell_dim.x    :  " <<  mc_cpu_cell_dim.x << endl;
-       cout << " mc_cpu_cell_dim.y    :  " <<  mc_cpu_cell_dim.y << endl;
-       cout << " mc_cpu_cell_dim.z    :  " <<  mc_cpu_cell_dim.z << endl;
-       cout << " ==================================="<<endl;
-    }
-
 	// change it accordingly to compute from Virtual topology
 	cpu_gcoord = get_cpu_gcoord(mc_prank,comm_name);
-
-    if (mc_prank == 0) {
-       cout << " ==================================="<<endl;
-       cout << " Montecarlo_new_api.cpp (get_cpu_gcoord -- after method call)    " << endl;
-       cout << " cpu_gcoord dim check " << endl;
-       cout << " cpu_gcoord.x    :  " <<  cpu_gcoord.x << endl;
-       cout << " cpu_gcoord.y    :  " <<  cpu_gcoord.y << endl;
-       cout << " cpu_gcoord.z    :  " <<  cpu_gcoord.z << endl;
-       cout << " ==================================="<<endl;
-    }
 
     // computing block dimension -- could be replaced by MPI Cart option
     ivec3d bloc_dim;
@@ -195,7 +106,71 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
 
     cols_block = bloc_dim.x; rows_block = bloc_dim.y; stacks_block = bloc_dim.z;
 
+
     if (mc_prank == 0) {
+
+       cout << "*****************************************************" << endl;
+       cout << "             Values  pass  check   "  << endl;
+       cout << " mc_tot_types :  " << mc_tot_types   << endl;
+       cout << " mc_real_types : " << mc_real_types  << endl;
+       cout << "*****************************************************" << endl;
+
+       cout << "***********************************"<< endl;
+       cout << " Parameter passing check -- init_montecarlo (Montecarlo_new_api.cpp) " << endl;
+       cout << "***********************************"<< endl;
+       cout << "mc_CPU dimension [ :"<< mc_cpu_dim.x << mc_cpu_dim.y << mc_cpu_dim.z << "]" <<endl;
+       cout << " simbox dimension x : [" << mc_simbox_x.x << " "<<mc_simbox_x.y <<" "<< mc_simbox_x.z << " " << " ]" <<endl;
+       cout << " simbox dimension y : [" << mc_simbox_y.x << " "<<mc_simbox_y.y <<" "<< mc_simbox_y.z << " " << " ]" <<endl;
+       cout << " simbox dimension z : [" << mc_simbox_z.x << " "<<mc_simbox_z.y <<" "<< mc_simbox_z.z << " " << " ]" <<endl;
+
+       for(int i=0; i<mc_tot_types; i++){
+          	cout<<"Restriction [ "<<i<<" ] : "<<mc_restriction[i].x<<" "<<mc_restriction[i].y<<" "<<mc_restriction[i].z<<endl;
+       }
+       cout << " mc_temperature : " << mc_temp << endl;
+       cout << " mc_sweep_radii : " << mc_rsweep << endl;
+       cout << " wall thickness : " << mc_sphere_wall << endl;
+       cout << " random no : " << mc_sample_seed << endl;
+
+       cout << " ==================================="<<endl;
+       cout << " Montecarlo_new_api.cpp (calc_cell_dim -- after method call)    " << endl;
+       cout << " mc_cell_dim check " << endl;
+       cout << " mc_cell_dim.x    :  " <<  mc_cell_dim.x << endl;
+       cout << " mc_cell_dim.y    :  " <<  mc_cell_dim.y << endl;
+       cout << " mc_cell_dim.z    :  " <<  mc_cell_dim.z << endl;
+       cout << " ==================================="<<endl;
+
+       cout << " ==================================="<<endl;
+       cout << " Montecarlo_new_api.cpp (calc_mc_cpu_box_vector -- after method call)    " << endl;
+       cout << " mc_cpu_box check " << endl;
+       cout << " mc_cpu_box_x    :  [ " <<  mc_cpu_box_x.x <<" "<<mc_cpu_box_x.y<<" "<<mc_cpu_box_x.z<<" "<<"]"<< endl;
+       cout << " mc_cpu_box_y    :  [ " <<  mc_cpu_box_y.x <<" "<<mc_cpu_box_y.y<<" "<<mc_cpu_box_y.z<<" "<<"]"<< endl;
+       cout << " mc_cpu_box_z    :  [ " <<  mc_cpu_box_z.x <<" "<<mc_cpu_box_z.y<<" "<<mc_cpu_box_z.z<<" "<<"]"<< endl;
+       cout << " ==================================="<<endl;
+       cout << " ==================================="<<endl;
+       cout << " Montecarlo_new_api.cpp (make_mc_tbox_vector -- after method call)    " << endl;
+       cout << " mc_tbox check " << endl;
+       cout << " mc_tbox_x    :  [ " <<  mc_tbox_x.x <<" "<<mc_tbox_x.y<<" "<<mc_tbox_x.z<<" "<<"]"<< endl;
+       cout << " mc_tbox_y    :  [ " <<  mc_tbox_y.x <<" "<<mc_tbox_y.y<<" "<<mc_tbox_y.z<<" "<<"]"<< endl;
+       cout << " mc_tbox_z    :  [ " <<  mc_tbox_z.x <<" "<<mc_tbox_z.y<<" "<<mc_tbox_z.z<<" "<<"]"<< endl;
+       cout << " ==================================="<<endl;
+
+       cout << " Montecarlo_new_api.cpp (calc_mc_global_cell_array -- after method call)    " << endl;
+       cout << " mc_global_cell_dim check " << endl;
+       cout << " mc_global_cell_dim.x    :  " <<  mc_global_cell_dim.x << endl;
+       cout << " mc_global_cell_dim.y    :  " <<  mc_global_cell_dim.y << endl;
+       cout << " mc_global_cell_dim.z    :  " <<  mc_global_cell_dim.z << endl;
+       cout << " ==================================="<<endl;
+       cout << " Montecarlo_new_api.cpp (calc_mc_cpu_cell_array -- after method call)    " << endl;
+       cout << " mc_cpu_cell_dim check " << endl;
+       cout << " mc_cpu_cell_dim.x    :  " <<  mc_cpu_cell_dim.x << endl;
+       cout << " mc_cpu_cell_dim.y    :  " <<  mc_cpu_cell_dim.y << endl;
+       cout << " mc_cpu_cell_dim.z    :  " <<  mc_cpu_cell_dim.z << endl;
+       cout << " ==================================="<<endl;
+       cout << " Montecarlo_new_api.cpp (get_cpu_gcoord -- after method call)    " << endl;
+       cout << " cpu_gcoord dim check " << endl;
+       cout << " cpu_gcoord.x    :  " <<  cpu_gcoord.x << endl;
+       cout << " cpu_gcoord.y    :  " <<  cpu_gcoord.y << endl;
+       cout << " cpu_gcoord.z    :  " <<  cpu_gcoord.z << endl;
        cout << " ==================================="<<endl;
        cout << " Montecarlo_new_api.cpp (calc_block_dim -- after method call)    " << endl;
        cout << " bloc_dim  check " << endl;
@@ -204,6 +179,7 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
        cout << " stacks_block  :  " <<  stacks_block << endl;
        cout << " ==================================="<<endl;
     }
+
 
     MPI_Barrier(comm); // for ordered printing
 
@@ -286,7 +262,7 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int accept_flag = 0; // acceptance flag
 
-	int dbug_flag = 1;   // debug flag -- print check statements
+	int dbug_flag = 0;   // debug flag -- print check statements
 
 
 
@@ -311,30 +287,8 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	r_cell = make_cells(c_obj,cpu_box_diag, mc_cell_dim,cpu_gcoord,mc_cpu_cell_dim,mc_prank);
 
-	// check values
-
-	/*
-	if(mc_prank == 0){
-	   ivec3d check_cell_gc = r_cell.get_cell(100).get_cell_glob_coord();
-	   ivec3d check_cell_lc = r_cell.get_cell(100).get_cell_loc_coord();
-
-       cout << "================================================" << endl;
-	   cout << "               From do_montecarlo after  make_cells             "  << endl;
-	   cout << "               cell block object check         "  << endl;
-	   //cout << " ncells_cpu : " << ncells_cpu << endl;
-	   cout << "  c_obj.get_mycpu()       " << r_cell.get_mycpu() << endl;
-       cout << "  c_obj.get_cell_list_size()      " << r_cell.get_cell_list_size() << endl;
-
-       cout << "    cell[100]     check     "  <<  endl;
-	   cout << "  cell glob coord : [  " << check_cell_gc.x<< " "<<check_cell_gc.y<<" "<<check_cell_gc.z<<" ]"<<endl;
-	   cout << "  cell loca coord : [  " << check_cell_lc.x<< " "<<check_cell_lc.y<<" "<<check_cell_lc.z<<" ]"<<endl;
-       cout << "================================================" << endl;
-
-	}
-	*/
 
     // create particles
-	// edited //make_particles(c_obj);
 
     tbox_dim[0] = mc_tbox_x.x; tbox_dim[1] = mc_tbox_x.y; tbox_dim[2] = mc_tbox_x.z;
     tbox_dim[3] = mc_tbox_y.x; tbox_dim[4] = mc_tbox_y.y; tbox_dim[5] = mc_tbox_y.z;
@@ -356,21 +310,6 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 //         mc_epot.clear();
 
 
-    if(mc_prank == 0) {
-
-    	long tot_particles=0; // check variable
-        cout << "****************************************************" << endl;
-
-        for(int i=0; i<r_partic.get_cell_list_size(); i++){
-    	     //cout << " No of particles in cell id  [ " << i << " ] : "<< r_partic.get_cell(i).get_nparticles()  << endl;
-    	     tot_particles += r_partic.get_cell(i).get_nparticles();
-
-        }
-        cout << " Total particles allocated after MAKE CELLS in CPU 0 " << tot_particles << endl;
-        cout << "****************************************************" << endl;
-    }
-
-
     // create velocities (T != 0K)
 	if(mc_temp>0){
 		r_vel = create_maxwell_velocities(r_partic,mc_temp,mc_restriction,mc_prank,dbug_flag);
@@ -378,27 +317,72 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 	}
 
 
-    if(mc_prank == 0) {
-
-    	long tot_particles=0; // check variable
-        cout << "****************************************************" << endl;
-
-        for(int i=0; i<r_vel.get_cell_list_size(); i++){
-    	     //cout << " No of particles in cell id  [ " << i << " ] : "<< r_partic.get_cell(i).get_nparticles()  << endl;
-    	     tot_particles += r_vel.get_cell(i).get_nparticles();
-
-        }
-        cout << " Total particles allocated after VELOCITY COMPUTATION in CPU 0 " << tot_particles << endl;
-        cout << "****************************************************" << endl;
-    }
-
     // sample window id(Hard coded for window 0)
     // extend the fragment with random selector
 
     int sample_id= 0;
 
     // particle instance
-    // edited // particle sam_particle = sample_zone(c_obj,sample_id);
+    particle rand_particle = sample_zone(r_partic,sample_id,mc_cpu_cell_dim,mc_prank);
+
+
+	// debug/control checking part
+
+    if(mc_prank == 0){
+
+	   /*
+	   ivec3d check_cell_gc = r_cell.get_cell(100).get_cell_glob_coord();
+	   ivec3d check_cell_lc = r_cell.get_cell(100).get_cell_loc_coord();
+
+       cout << "================================================" << endl;
+	   cout << "               From do_montecarlo after  make_cells             "  << endl;
+	   cout << "               cell block object check         "  << endl;
+	   //cout << " ncells_cpu : " << ncells_cpu << endl;
+	   cout << "  c_obj.get_mycpu()       " << r_cell.get_mycpu() << endl;
+       cout << "  c_obj.get_cell_list_size()      " << r_cell.get_cell_list_size() << endl;
+
+       cout << "    cell[100]     check     "  <<  endl;
+	   cout << "  cell glob coord : [  " << check_cell_gc.x<< " "<<check_cell_gc.y<<" "<<check_cell_gc.z<<" ]"<<endl;
+	   cout << "  cell loca coord : [  " << check_cell_lc.x<< " "<<check_cell_lc.y<<" "<<check_cell_lc.z<<" ]"<<endl;
+       cout << "================================================" << endl;
+       */
+
+       long tot_particles=0; // check variable
+       cout << "****************************************************" << endl;
+
+       for(int i=0; i<r_partic.get_cell_list_size(); i++){
+    	     //cout << " No of particles in cell id  [ " << i << " ] : "<< r_partic.get_cell(i).get_nparticles()  << endl;
+    	     tot_particles += r_partic.get_cell(i).get_nparticles();
+
+       }
+
+       cout << " Total particles allocated after MAKE CELLS in CPU 0 " << tot_particles << endl;
+       cout << "****************************************************" << endl;
+
+   	   tot_particles=0; // check variable
+       cout << "****************************************************" << endl;
+
+       for(int i=0; i<r_vel.get_cell_list_size(); i++){
+   	     //cout << " No of particles in cell id  [ " << i << " ] : "<< r_partic.get_cell(i).get_nparticles()  << endl;
+   	     tot_particles += r_vel.get_cell(i).get_nparticles();
+
+       }
+       cout << " Total particles allocated after VELOCITY COMPUTATION in CPU 0 " << tot_particles << endl;
+       cout << "****************************************************" << endl;
+
+       cout << " After sample zone test " << endl;
+	   cout << "  Randomly selected placeholder scope check  " << endl;
+	   cout << "  Random particle id  : " << rand_particle.get_mynumber() << endl;
+	   cout << "  Random particle type: " << rand_particle.get_mytype() << endl;
+	   cout << "  Random particle mass  " << rand_particle.get_mymass() << endl;
+	   vec3d loc_pos,loc_vel;
+	   loc_pos = rand_particle.get_myposition();
+	   loc_vel = rand_particle.get_myvelocity();
+	   cout << "  Random particle position :  [ " << loc_pos.x <<" "<<loc_pos.y<<" "<<loc_pos.z<<" "<< " ]"<<endl;
+       cout << "  Random particle velocity :  [ " << loc_vel.x <<" "<<loc_vel.y<<" "<<loc_vel.z<<" "<< " ]"<<endl;
+       cout << "  Random particle Epot       : " << rand_particle.get_myepot() << endl;
+
+	}
 
 
     //run local MD

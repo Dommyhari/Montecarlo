@@ -42,6 +42,8 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
 
 double get_gaussian(double sigma);
 
+particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank);
+
 double scalar_prod(vec3d u, vec3d v);
 
 int iscalar_prod(ivec3d u, ivec3d v);

@@ -262,6 +262,10 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int accept_flag = 0; // acceptance flag
 
+	int win_id = 0;  // Hardcoded for testing
+
+	int test_cpu = 7;
+
 	int dbug_flag = 0;   // debug flag -- print check statements
 
 
@@ -322,9 +326,13 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     int sample_id= 0;
 
-    // particle instance
+    // particle instance -- sample zone method
     particle rand_particle = sample_zone(r_partic,sample_id,mc_cpu_cell_dim,mc_prank);
 
+    // construct sphere
+    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu);
+
+    //construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat)
 
 	// debug/control checking part
 

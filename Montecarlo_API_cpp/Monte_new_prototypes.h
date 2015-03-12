@@ -42,7 +42,11 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
 
 double get_gaussian(double sigma);
 
+int get_cpu_rank(int inde0,int inde1,int inde2, MPI_Comm c_name);
+
 particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank);
+
+celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat,int test_rank);
 
 double scalar_prod(vec3d u, vec3d v);
 

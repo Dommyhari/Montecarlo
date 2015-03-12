@@ -288,16 +288,16 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
 	}//stack loop
 
-    if(prank == 0) {
+    if(prank != 10) {
       cout << " ========================================================================" << endl;
       cout << " my process id :  " << prank << endl;
       cout << " CPU coordinate  : " << gcoord.x <<" " << gcoord.y <<" "<<gcoord.z <<" "<< endl;
-      cout << " Cell allocation check :  no of cells  :  " <<  loc_obj.get_cell_list_size() << endl;
-      cout << " cell ID :" << loc_obj.get_cell(cell_no).get_cell_id();
-      cout << "   cell global coordinate        "<< loc_obj.get_cell(cell_no).get_cell_glob_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().y
-      		  <<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().z<<endl;
-      cout << "   cell local coordinate        "<< loc_obj.get_cell(cell_no).get_cell_loc_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().y
-      		  <<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().z<<endl;
+      //cout << " Cell allocation check :  no of cells  :  " <<  loc_obj.get_cell_list_size() << endl;
+      //cout << " cell ID :" << loc_obj.get_cell(cell_no).get_cell_id();
+      //cout << "   cell global coordinate        "<< loc_obj.get_cell(cell_no).get_cell_glob_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().y
+      //		  <<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().z<<endl;
+      //cout << "   cell local coordinate        "<< loc_obj.get_cell(cell_no).get_cell_loc_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().y
+      //		  <<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().z<<endl;
       cout << " ========================================================================" << endl;
     }
 
@@ -611,8 +611,7 @@ double get_gaussian(double sigma){
 
 }
 
-
-
+// Tested
 particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 
 	celltype cobj;             // cell object
@@ -666,7 +665,7 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
     	}
     }
 
-
+    /*
     if(prank == 0){
 
     	cout << " %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << endl;
@@ -696,6 +695,7 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
     	cout << " %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << endl;
 
     }
+    */
 
     // choose one cell in random (belong to sample window)
 
@@ -725,56 +725,281 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 	return atom;
 }
 
-//celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name){
-//
-//	celltype sphere_old;
-//
-//	// possible neighbor index as per window location
-//
-//	int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
-//	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
-//	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
-//
-//	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
-//
-//	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
-//	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
-//
-//	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
-//
-//	// ==========================================================
-//	// Detect neighbor processes as per window position
-//	// ==========================================================
-//    // select neighbors as per sample window position
-//	int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
-//
-//	// send neighbors (to whom I send)        ---- process communications (in z direction)
-//	int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
-//
-//	// Receive neighbors (to whom I receive) ----- process communications (in z direction)
-//	int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
-//
-//    // send neighbors (to whom I send) -----  process communications (in x/y direction)
-//	int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
-//
-//	// Receive neighbors (to whom I send) -----  process communications (in x/y direction)
-//	int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
-//
-//	// get my process global coordinate
-//	ivec3d gcoord = get_cpu_gcoord(prank,comm_name);
-//	int x = gcoord.x; int y = gcoord.y; int z = gcoord.z;
-//
-//	// variables to store the position of selected particle on my CPU and neighbor CPU's
-//	// randomly selected particle positions (my CPU and rec_neighbor CPU)
-//
-//	double my_pos[3], rec_pos_0[3],rec_pos_1[3],rec_pos_2[3],rec_pos_3[3],rec_pos_4[3],rec_pos_5[3],rec_pos_6[3];
-//
-//	double* rec_pos[7]={rec_pos_0,rec_pos_1,rec_pos_2,rec_pos_3,rec_pos_4,rec_pos_5,rec_pos_6};
-//
-//	my_pos[0]=pobj.get_myposition().x; my_pos[1]=pobj.get_myposition().y; my_pos[2]=pobj.get_myposition().z;
-//
-//	return sphere_old;
-//}
+celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat,int test_rank){
+
+	celltype sphere_old;
+
+	// possible neighbor index as per window location
+
+	int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
+	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
+	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
+
+	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
+
+	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
+	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
+
+	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
+
+	// ==========================================================
+	// Detect neighbor processes (maximum 7 if periodicity is enabled in all direction) as per window position
+	// ==========================================================
+    // select neighbors as per sample window position
+	int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
+
+	// send neighbors (to whom I send)        ---- process communications (in z direction)
+	int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
+
+	// Receive neighbors (to whom I receive) ----- process communications (in z direction)
+	int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
+
+    // send neighbors (to whom I send) -----  process communications (in x/y direction)
+	int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
+
+	// Receive neighbors (to whom I send) -----  process communications (in x/y direction)
+	int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
+
+	// variables to store the position of selected particle on my CPU and neighbor CPU's
+	// randomly selected particle positions (my CPU and rec_neighbor CPU)
+
+	double my_pos[3], rec_pos_0[3],rec_pos_1[3],rec_pos_2[3],rec_pos_3[3],rec_pos_4[3],rec_pos_5[3],rec_pos_6[3];
+
+	double* rec_pos[7]={rec_pos_0,rec_pos_1,rec_pos_2,rec_pos_3,rec_pos_4,rec_pos_5,rec_pos_6}; // get and store positions from all seven neighbors
+
+	//  get chosen random particle position
+	my_pos[0]=pobj.get_myposition().x; my_pos[1]=pobj.get_myposition().y; my_pos[2]=pobj.get_myposition().z;
+
+
+	//***************************************************************************
+	// communication part -- send/request neighbors with chosen particle
+	//***************************************************************************
+
+	// get my process global coordinate
+	ivec3d gcoord = get_cpu_gcoord(prank,comm_name);
+	int x = gcoord.x; int y = gcoord.y; int z = gcoord.z; // [ x y z] -- this process coordinate from MPI Cartesian system
+
+	int send_id,rec_id;
+	double* posit;
+
+	// synchronize communication
+	MPI_Barrier(comm_name);
+
+	if(prank == test_rank){
+		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
+		cout << "   MPI Communication in Z direction     " << endl;
+
+	}
+
+	// z direction communication
+	for (int ind=0;ind<4;ind++){
+
+	     if (z%2==0){ // if z is even
+
+	       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name),0,comm_name);
+
+	       if(prank == test_rank){
+
+	    	   send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
+	    	   cout << " I sent :  [ " << my_pos[0] << " " << my_pos[1] << ""<<" " <<my_pos[2] << endl;
+	    	   cout << " Process :  " << prank <<" sent data to front target process : " << send_id << endl;
+	       }
+
+	       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name),1,comm_name,&stat);
+
+	       if(prank == test_rank){
+	    	   rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+	    	   cout << " Process :  " << prank <<" received data from back target process : " << rec_id << endl;
+	    	   posit = rec_pos[ind];
+	    	   cout << " I received :  [ " << posit[0] << " " << posit[1] << ""<<" " <<posit[2] << endl;
+
+	       }
+
+	     }
+	     else{       // if z is odd
+
+	       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name),0,comm_name,&stat);
+
+	       if(prank == test_rank){
+
+	    	   rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+	    	   cout << " Process :  " << prank <<" received data from back target process : " << rec_id << endl;
+	    	   posit = rec_pos[ind];
+	    	   cout << " I received :  [ " << posit[0] << " " << posit[1] << ""<<" " <<posit[2] << endl;
+
+	       }
+
+	       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name),1,comm_name);
+
+	       if(prank == test_rank){
+
+	    	   send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
+	    	   cout << " Process :  " << prank <<" sent data to front target process : " << send_id << endl;
+	       }
+
+
+	     }
+	}
+
+	// Next phase even-even or odd-odd communications
+
+	if(prank == test_rank){
+		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
+		cout << "   MPI Communication in X direction     " << endl;
+
+	}
+
+	// x direction communication
+	if (x%2 == 0){    // if x is even
+	         // right & left comm
+	       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name),2,comm_name);
+
+	       if(prank == test_rank){
+	    	   send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
+	    	   cout << " Process :  " << prank <<" sent data to right target process : " << send_id << endl;
+	       }
+
+	       MPI_Recv(rec_pos[4],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name),3,comm_name,&stat);
+
+	       if(prank == test_rank){
+	    	   rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
+	    	   cout << " Process :  " << prank <<" received data from left target process : " << rec_id << endl;
+	    	   posit = rec_pos[4];
+	    	   cout << " I received :  [ " << posit[0] << " " << posit[1] << ""<<" " <<posit[2] << endl;
+
+	       }
+
+	         // top-right & bottom-left comm
+	       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name),4,comm_name);
+
+	       if(prank == test_rank){
+	    	   send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
+	    	   cout << " Process :  " << prank <<" sent data to top - right target process : " << send_id << endl;
+	       }
+
+	       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name),5,comm_name,&stat);
+
+	       if(prank == test_rank){
+	    	   rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
+	    	   cout << " Process :  " << prank <<" received data from bottom - left target process : " << rec_id << endl;
+	    	   posit = rec_pos[5];
+	    	   cout << " I received :  [ " << posit[0] << " " << posit[1] << ""<<" " <<posit[2] << endl;
+
+	       }
+
+	}
+	else{            // if x is odd
+		   // right & left comm
+	       MPI_Recv(rec_pos[4],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name),2,comm_name,&stat);
+
+	       if(prank == test_rank){
+	    	   rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
+	    	   cout << " Process :  " << prank <<" received data from left target process : " << rec_id << endl;
+	    	   posit = rec_pos[4];
+	    	   cout << " I received :  [ " << posit[0] << " " << posit[1] << ""<<" " <<posit[2] << endl;
+
+	       }
+
+	       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name),3,comm_name);
+
+	       if(prank == test_rank){
+	    	   send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
+	    	   cout << " Process :  " << prank <<" sent data to right target process : " << send_id << endl;
+	       }
+
+
+	       // top-right & bottom-left comm
+	       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name),4,comm_name,&stat);
+
+	       if(prank == test_rank){
+	    	   rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
+	    	   cout << " Process :  " << prank <<" received data from bottom - left target process : " << rec_id << endl;
+	    	   posit = rec_pos[5];
+	    	   cout << " I received :  [ " << posit[0] << " " << posit[1] << ""<<" " <<posit[2] << endl;
+
+	       }
+
+	       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name),5,comm_name);
+
+	       if(prank == test_rank){
+	    	   send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
+	    	   cout << " Process :  " << prank <<" sent data to top - right target process : " << send_id << endl;
+	       }
+
+	}
+
+	if(prank == test_rank){
+		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
+		cout << "   MPI Communication in Y direction     " << endl;
+
+	}
+
+	// y direction communication
+
+	if (y%2 == 0){      // if y is even
+	         // top & bottom comm
+	       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name),4,comm_name);
+
+	       if(prank == test_rank){
+	    	   send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
+	    	   cout << " Process :  " << prank <<" sent data to bottom target process : " << send_id << endl;
+	       }
+
+	       MPI_Recv(rec_pos[6],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),5,comm_name,&stat);
+
+	       if(prank == test_rank){
+	    	   rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
+	    	   cout << " Process :  " << prank <<" received data from top target process : " << rec_id << endl;
+	    	   posit = rec_pos[6];
+	    	   cout << " I received :  [ " << posit[0] << " " << posit[1] << ""<<" " <<posit[2] << endl;
+
+	       }
+	}
+	else{              // if y is odd
+
+	       MPI_Recv(rec_pos[6],3,MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),4,comm_name,&stat);
+
+	       if(prank == test_rank){
+	    	   rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
+	    	   cout << " Process :  " << prank <<" received data from top target process : " << rec_id << endl;
+	    	   posit = rec_pos[6];
+	    	   cout << " I received :  [ " << posit[0] << " " << posit[1] << ""<<" " <<posit[2] << endl;
+
+	       }
+	       MPI_Send(my_pos,3,MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name),5,comm_name);
+
+	       if(prank == test_rank){
+	    	   send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
+	    	   cout << " Process :  " << prank <<" sent data to bottom target process : " << send_id << endl;
+	       }
+	}
+
+	if(prank == test_rank){
+		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
+	}
+
+
+
+	// synchronize communication
+	MPI_Barrier(comm_name);
+
+
+
+	return sphere_old;
+}
+
+int get_cpu_rank(int inde0,int inde1,int inde2, MPI_Comm c_name){
+	// gives my cpu rank with my own coordinates
+	int nb_grid_coord[3],nb_rank;
+    nb_grid_coord[0] = inde0;
+    nb_grid_coord[1] = inde1;
+    nb_grid_coord[2] = inde2;
+
+    // get process rank from grid coord
+    MPI_Cart_rank(c_name,nb_grid_coord,&nb_rank);
+    return nb_rank;
+
+}
 
 // some utility methods
 

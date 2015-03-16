@@ -208,10 +208,8 @@ extern "C" void pack_config_to_montecarlo(long md_mc_tatoms_cpu,long *md_mc_atom
 			if ((mc_prank == 0)  && (i==0)){
 				long n =0;
 				n=m;
-
 				cout << "***********************************************************" << endl;
 				cout << "   check while packing " << endl;
-
 				cout << " check for value i :  " << i << endl;
 				cout << " md_mc_atomnumber[i] : " << md_mc_atomnumber[i] << endl;
 				cout << " md_mc_atomtypes[i]  : " << md_mc_atomtypes[i]  << endl;
@@ -220,7 +218,6 @@ extern "C" void pack_config_to_montecarlo(long md_mc_tatoms_cpu,long *md_mc_atom
 				cout << " md_mc_positions[n++] : " << md_mc_positions[n++]  << endl;
 				cout << " md_mc_positions[n++] : " << md_mc_positions[n++]  << endl;
 				cout << " md_mc_epot[i]        : " << md_mc_epot[i] << endl;
-
 				cout << "***********************************************************" << endl;
 			}
             */
@@ -262,9 +259,9 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int accept_flag = 0; // acceptance flag
 
-	int win_id = 0;  // Hardcoded for testing
+	int win_id = 2;  // Hardcoded for testing
 
-	int test_cpu = 7;
+	int test_cpu = 0;
 
 	int dbug_flag = 0;   // debug flag -- print check statements
 
@@ -324,13 +321,13 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     // sample window id(Hard coded for window 0)
     // extend the fragment with random selector
 
-    int sample_id= 0;
+    int sample_id= win_id;
 
     // particle instance -- sample zone method
     particle rand_particle = sample_zone(r_partic,sample_id,mc_cpu_cell_dim,mc_prank);
 
     // construct sphere
-    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu);
+    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim);
 
     //construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat)
 
@@ -341,14 +338,12 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 	   /*
 	   ivec3d check_cell_gc = r_cell.get_cell(100).get_cell_glob_coord();
 	   ivec3d check_cell_lc = r_cell.get_cell(100).get_cell_loc_coord();
-
        cout << "================================================" << endl;
 	   cout << "               From do_montecarlo after  make_cells             "  << endl;
 	   cout << "               cell block object check         "  << endl;
 	   //cout << " ncells_cpu : " << ncells_cpu << endl;
 	   cout << "  c_obj.get_mycpu()       " << r_cell.get_mycpu() << endl;
        cout << "  c_obj.get_cell_list_size()      " << r_cell.get_cell_list_size() << endl;
-
        cout << "    cell[100]     check     "  <<  endl;
 	   cout << "  cell glob coord : [  " << check_cell_gc.x<< " "<<check_cell_gc.y<<" "<<check_cell_gc.z<<" ]"<<endl;
 	   cout << "  cell loca coord : [  " << check_cell_lc.x<< " "<<check_cell_lc.y<<" "<<check_cell_lc.z<<" ]"<<endl;
@@ -519,7 +514,3 @@ extern "C" void shut_down_montecarlo(){
     // NOTE: look for further possibilities
 
 }
-
-
-
-

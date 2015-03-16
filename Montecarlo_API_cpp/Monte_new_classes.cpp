@@ -51,7 +51,6 @@ celltype::celltype(void){
 	      sample_fact = 0;
 	      particle_counter = 0;
 }
-
 */
 void celltype::set_cell_id(int uid)                   {  cell_id = uid ; }
 void celltype::set_glob_coord(ivec3d cell_gcoord)     {  gcoord = cell_gcoord; }
@@ -83,5 +82,3 @@ celltype cellblock::cell_with_lcoord(ivec3d lcoord, long ncells){
 	}
 	return target;
 }
-
-

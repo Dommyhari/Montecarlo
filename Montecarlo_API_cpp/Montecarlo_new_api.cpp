@@ -64,25 +64,15 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
     loc_cell_dim.y = mc_simbox_y.y;
     loc_cell_dim.z = mc_simbox_z.z;
 
-    mc_cell_dim = calc_cell_dim(mc_rsweep,loc_cell_dim);
+
+
+    mc_cell_dim.x = mc_rsweep; mc_cell_dim.y = mc_rsweep; mc_cell_dim.z = mc_rsweep;
 
     // compute cpu box physical dimensions
 
     mc_cpu_box_x = calc_mc_cpu_box_vector(mc_simbox_x, mc_cpu_dim.x); // CPU box x vector
     mc_cpu_box_y = calc_mc_cpu_box_vector(mc_simbox_y, mc_cpu_dim.y); // CPU box y vector
     mc_cpu_box_z = calc_mc_cpu_box_vector(mc_simbox_z, mc_cpu_dim.z); // CPU box z vector
-
-    // compute Tranformation box
-
-    vec3d* Tbox;
-    vec3d* simbox;
-
-    // assign simulation physical box
-    simbox[0] = mc_simbox_x; simbox[1] = mc_simbox_y; simbox[2] = mc_simbox_z;
-
-    Tbox = make_mc_tbox_vector(simbox,mc_prank);
-
-    mc_tbox_x = Tbox[0]; mc_tbox_y = Tbox[1]; mc_tbox_z = Tbox[2];
 
 	// compute global cell array
     vec3d simbox_diag;
@@ -147,13 +137,6 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
        cout << " mc_cpu_box_z    :  [ " <<  mc_cpu_box_z.x <<" "<<mc_cpu_box_z.y<<" "<<mc_cpu_box_z.z<<" "<<"]"<< endl;
        cout << " ==================================="<<endl;
        cout << " ==================================="<<endl;
-       cout << " Montecarlo_new_api.cpp (make_mc_tbox_vector -- after method call)    " << endl;
-       cout << " mc_tbox check " << endl;
-       cout << " mc_tbox_x    :  [ " <<  mc_tbox_x.x <<" "<<mc_tbox_x.y<<" "<<mc_tbox_x.z<<" "<<"]"<< endl;
-       cout << " mc_tbox_y    :  [ " <<  mc_tbox_y.x <<" "<<mc_tbox_y.y<<" "<<mc_tbox_y.z<<" "<<"]"<< endl;
-       cout << " mc_tbox_z    :  [ " <<  mc_tbox_z.x <<" "<<mc_tbox_z.y<<" "<<mc_tbox_z.z<<" "<<"]"<< endl;
-       cout << " ==================================="<<endl;
-
        cout << " Montecarlo_new_api.cpp (calc_mc_global_cell_array -- after method call)    " << endl;
        cout << " mc_global_cell_dim check " << endl;
        cout << " mc_global_cell_dim.x    :  " <<  mc_global_cell_dim.x << endl;
@@ -270,7 +253,8 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 	// creating cellblock object
 
 	cellblock c_obj, r_cell,r_partic, r_vel;
-	double tbox_dim[9];
+
+
 
 	// CPU box dimension
 	vec3d cpu_box_diag;
@@ -291,14 +275,11 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     // create particles
 
-    tbox_dim[0] = mc_tbox_x.x; tbox_dim[1] = mc_tbox_x.y; tbox_dim[2] = mc_tbox_x.z;
-    tbox_dim[3] = mc_tbox_y.x; tbox_dim[4] = mc_tbox_y.y; tbox_dim[5] = mc_tbox_y.z;
-    tbox_dim[6] = mc_tbox_z.x; tbox_dim[7] = mc_tbox_z.y; tbox_dim[8] = mc_tbox_z.z;
 
 
 
-    r_partic = make_particles(r_cell,mc_tatoms_cpu, tbox_dim, mc_global_cell_dim,cpu_gcoord,mc_cpu_cell_dim,
-        		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot,mc_prank,dbug_flag);
+    r_partic = make_particles(r_cell,mc_tatoms_cpu, mc_global_cell_dim,cpu_gcoord,mc_cpu_cell_dim,
+        		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot,mc_prank,dbug_flag,mc_cell_dim);
 
 
     // clear STL container (once particle objects are created)
@@ -326,8 +307,12 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     // particle instance -- sample zone method
     particle rand_particle = sample_zone(r_partic,sample_id,mc_cpu_cell_dim,mc_prank);
 
+
+    double* dat_list;
+    dat_list[0] = (mc_cpu_cell_dim.x/2 * mc_cpu_cell_dim.y/2 * mc_cpu_cell_dim.z/2 );
+
     // construct sphere
-    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim);
+    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list);
 
     //construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat)
 

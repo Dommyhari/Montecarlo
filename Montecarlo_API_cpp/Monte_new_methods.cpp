@@ -36,44 +36,6 @@ vec3d calc_mc_cpu_box_vector(vec3d simbox_vec, int dim){
 
 }
 
-vec3d* make_mc_tbox_vector(vec3d* simbox,int prank){
-
- // transformation box concept is mandatory to implement PBC effect correctly
- //  compute box transformation matrix;
- //  NOTE: need to be extended or verified
-
- vec3d 	tbox_x, tbox_y,tbox_z;
- double mc_volume;                                                    // some internal attributes for mapping
- vec3d mc_height;                                                      // used for global cell coordinates
- vec3d v_list[3];
-
- /* first unnormalized */
-
- tbox_x = vector_prod( simbox[1], simbox[2] );
- tbox_y = vector_prod( simbox[2], simbox[0] );
- tbox_z = vector_prod( simbox[0], simbox[1] );
-
- /* volume */
- mc_volume = scalar_prod( simbox[0], tbox_x );
-
- if ((0==prank) && (0==mc_volume))
-	  std::cerr <<"Box Edges are parallel.";
-
- /* normalization */
- tbox_x.x /= mc_volume;  tbox_x.y /= mc_volume;  tbox_x.z /= mc_volume;
- tbox_y.x /= mc_volume;  tbox_y.y /= mc_volume;  tbox_y.z /= mc_volume;
- tbox_z.x /= mc_volume;  tbox_z.y /= mc_volume;  tbox_z.z /= mc_volume;
-
- /* squares of the box heights perpendicular to the faces */
- mc_height.x = 1.0 / scalar_prod(tbox_x,tbox_x);
- mc_height.y = 1.0 / scalar_prod(tbox_y,tbox_y);
- mc_height.z = 1.0 / scalar_prod(tbox_z,tbox_z);
-
- v_list[0] = tbox_x; v_list[1] = tbox_y; v_list[2] = tbox_z;
-
- return v_list;
-}
-
 ivec3d calc_mc_global_cell_array(vec3d simbox_diag,vec3d cell_dim){
 
 	//           MonteCarlo global cell array computation
@@ -174,40 +136,35 @@ ivec3d get_cell_loc_coord(ivec3d glob_coord, ivec3d cpu_glob_pos, ivec3d cpu_cel
 	return cell_loc_coord;
 }
 
-ivec3d cell_coordinate(double* pos,double* tbox,ivec3d global_cell_dim){
 
-  //  cell_coord computes the (global) cell coordinates of a position
-  //   NOTE: need to be extended or verified
+ivec3d get_particle_glob_coordinate(double* pos,vec3d mc_cell_phy_dim){
 
-  double x,y,z;
-  ivec3d coord;
-  vec3d tbox_x,tbox_y,tbox_z;
-  int m=0;
-  // assignment
-  x = pos[0]; y = pos[1]; z = pos[2];
+	//  cell_coord computes the (global) cell coordinates of a position
+	ivec3d coord;
+	double x,y,z;                   // holds position
+	int x_quo,y_quo,z_quo;       // holds quotient
+	double x_rem,y_rem,z_rem;       // holds remainder
+
+	// assignment
+	x = pos[0]; y = pos[1]; z = pos[2];
+
+	// quotient computation
+	x_quo = (int) x/mc_cell_phy_dim.x ; y_quo = (int) y/mc_cell_phy_dim.y ; z_quo = (int) z/mc_cell_phy_dim.z ;
+
+	// remainder computation
+	//x_rem = x%mc_cell_phy_dim.x ; y_rem = y%mc_cell_phy_dim.y ; z_rem = z%mc_cell_phy_dim.z ;
+
+	x_rem = fmod (x,mc_cell_phy_dim.x) ; y_rem = fmod(y,mc_cell_phy_dim.y) ; z_rem = fmod(z,mc_cell_phy_dim.z) ;
+
+	if(x_rem > 0.0) { x_quo++; }
+	if(y_rem > 0.0) { y_quo++; }
+	if(z_rem > 0.0) { z_quo++; }
 
 
-  tbox_x.x = tbox[0]; tbox_x.y = tbox[1]; tbox_x.z = tbox[2];
-  tbox_y.x = tbox[3]; tbox_y.y = tbox[4]; tbox_y.z = tbox[5];
-  tbox_z.x = tbox[6]; tbox_z.y = tbox[7]; tbox_z.z = tbox[8];
+	coord.x = x_quo; coord.y = y_quo; coord.z = z_quo;
 
-  /* Map positions to boxes */
-  coord.x = (int)(global_cell_dim.x * (x*tbox_x.x + y*tbox_x.y + z*tbox_x.z));
-  coord.y = (int)(global_cell_dim.y * (x*tbox_y.x + y*tbox_y.y + z*tbox_y.z));
-  coord.z = (int)(global_cell_dim.z * (x*tbox_z.x + y*tbox_z.y + z*tbox_z.z));
+	return coord;
 
-
-  /* rounding errors may put atoms slightly outside the simulation cell */
-  /* in the case of no pbc they may even be far outside */
-
-  if      (coord.x >= global_cell_dim.x) coord.x = global_cell_dim.x - 1;
-  else if (coord.x < 0)                  coord.x = 0;
-  if      (coord.y >= global_cell_dim.y) coord.y = global_cell_dim.y - 1;
-  else if (coord.y < 0)                  coord.y = 0;
-  if      (coord.z >= global_cell_dim.z) coord.z = global_cell_dim.z - 1;
-  else if (coord.z < 0)                  coord.z = 0;
-
-  return coord;
 }
 
 // Tested
@@ -288,18 +245,18 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
 	}//stack loop
 
-    if(prank != 10) {
-      cout << " ========================================================================" << endl;
-      cout << " my process id :  " << prank << endl;
-      cout << " CPU coordinate  : " << gcoord.x <<" " << gcoord.y <<" "<<gcoord.z <<" "<< endl;
-      //cout << " Cell allocation check :  no of cells  :  " <<  loc_obj.get_cell_list_size() << endl;
-      //cout << " cell ID :" << loc_obj.get_cell(cell_no).get_cell_id();
-      //cout << "   cell global coordinate        "<< loc_obj.get_cell(cell_no).get_cell_glob_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().y
-      //		  <<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().z<<endl;
-      //cout << "   cell local coordinate        "<< loc_obj.get_cell(cell_no).get_cell_loc_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().y
-      //		  <<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().z<<endl;
-      cout << " ========================================================================" << endl;
-    }
+//    if(prank != 10) {
+//      cout << " ========================================================================" << endl;
+//      cout << " my process id :  " << prank << endl;
+//      cout << " CPU coordinate  : " << gcoord.x <<" " << gcoord.y <<" "<<gcoord.z <<" "<< endl;
+//      //cout << " Cell allocation check :  no of cells  :  " <<  loc_obj.get_cell_list_size() << endl;
+//      //cout << " cell ID :" << loc_obj.get_cell(cell_no).get_cell_id();
+//      //cout << "   cell global coordinate        "<< loc_obj.get_cell(cell_no).get_cell_glob_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().y
+//      //		  <<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().z<<endl;
+//      //cout << "   cell local coordinate        "<< loc_obj.get_cell(cell_no).get_cell_loc_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().y
+//      //		  <<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().z<<endl;
+//      cout << " ========================================================================" << endl;
+//    }
 
 
 
@@ -311,8 +268,9 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
 
 // Tested
-cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
-		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank,int debug){
+cellblock make_particles(cellblock loc_obj, long tatoms_cpu, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
+		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank,int debug,vec3d cell_dim){
+
 
      // method for creating particle objects and fill in cell container
 
@@ -373,7 +331,12 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, i
  		 */
 
 
- 		 cell_glob_coord = cell_coordinate(inst_pos,tbox_dim,global_cell_dim);
+ 		 cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim); // New try with my method
+
+ 		 // decrement operations
+ 		 cell_glob_coord.x = cell_glob_coord.x-1; cell_glob_coord.y = cell_glob_coord.y-1; cell_glob_coord.z = cell_glob_coord.z-1;
+
+ 		 //cell_glob_coord = cell_coordinate(inst_pos,tbox_dim,global_cell_dim); // Earlier implementation
 
  		 ivec3d cpu_fact = loc_cpu_gcoord;
 
@@ -381,10 +344,10 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, i
  		 ivec3d cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact,cpu_cell_dim);
 
  		 // to get memory index of cell in cell list
- 		 cell_index = cell_loc_coord.x + (cell_loc_coord.y * cpu_cell_dim.x) + (cell_loc_coord.z * cpu_cell_dim.y * cpu_cell_dim.x);
+ 		 //cell_index = cell_loc_coord.x + (cell_loc_coord.y * cpu_cell_dim.x) + (cell_loc_coord.z * cpu_cell_dim.y * cpu_cell_dim.x);
 
 
- 		 //int cell_index = loc_obj.cell_with_lcoord(cell_loc_coord,total_cells).get_cell_id(); // expensive!!!!
+ 		 cell_index = loc_obj.cell_with_lcoord(cell_loc_coord,total_cells).get_cell_id(); // expensive!!!!
 
       	 // just for testing add all particles to cell 1
 
@@ -394,24 +357,24 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, i
 
          loc_obj.set_cell(cell0,cell_index);  // update cell object with included particle
 
-         if (debug == 1){
-
-        	   if((prank == 0) &&  (cell_index==100) && (l_counter == 0)){
-
-        		         cout << "  Super check: Inside make particles " << endl;
-                         cout << "  cell index  : " << cell_index << endl;
-                         cout << "  cell size :  " <<  loc_obj.get_cell(cell_index).get_nparticles() << endl;
-                         cout << "  my no :" << loc_obj.get_cell(cell_index).get_particle(0).get_mynumber() << endl;
-    	                 cout << "  my type :" << loc_obj.get_cell(cell_index).get_particle(0).get_mytype() << endl;
-        	             cout << "  my mass :" << loc_obj.get_cell(cell_index).get_particle(0).get_mymass() << endl;
-        	             cout << "  my pos:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().x << endl;
-        	             cout << "  my pos:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().y << endl;
-        	             cout << "  my pos:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().z << endl;
-    	                 cout << "  epot      "<< loc_obj.get_cell(cell_index).get_particle(0).get_myepot() << endl;
-
-    	                 l_counter++;
-           }
-         }
+//         if (debug == 1){
+//
+//        	   if((prank == 6) &&  (cell_index==63) && (l_counter == 0)){
+//
+//        		         cout << "  Super check: Inside make particles " << endl;
+//                         cout << "  cell index  : " << cell_index << endl;
+//                         cout << "  cell size :  " <<  loc_obj.get_cell(cell_index).get_nparticles() << endl;
+//                         cout << "  my no :" << loc_obj.get_cell(cell_index).get_particle(0).get_mynumber() << endl;
+//    	                 cout << "  my type :" << loc_obj.get_cell(cell_index).get_particle(0).get_mytype() << endl;
+//        	             cout << "  my mass :" << loc_obj.get_cell(cell_index).get_particle(0).get_mymass() << endl;
+//        	             cout << "  my pos:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().x << endl;
+//        	             cout << "  my pos:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().y << endl;
+//        	             cout << "  my pos:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().z << endl;
+//    	                 cout << "  epot      "<< loc_obj.get_cell(cell_index).get_particle(0).get_myepot() << endl;
+//
+//    	                 l_counter++;
+//           }
+//         }
 
  		 }// end of for loop
 
@@ -663,7 +626,7 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
     }
 
 
-//    if(prank == 0){
+//    if(prank == 6){
 //    	cout << " %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << endl;
 //    	cout << "---                Inside sample zone method                      ---------" << endl;
 //    	cout << " My process CPU  : " << prank << endl;
@@ -672,23 +635,44 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 //    	cout << " Included no of cells from loop counter :   " << count << endl;
 //    	// print cell local coordinate and check??
 //    	ivec3d loc_coord;
+//    	ivec3d glo_coord;
+//    	vec3d pos_ph;
 //    	cout << "=======================================================" << endl;
 //    	cout << "                       sample cells check     "  << endl;
 //    	cout << "=======================================================" << endl;
 //    	for( int i=0; i<sam_cell_counter;i++){
 //    		loc_coord = sample_cells[i].get_cell_loc_coord();
-//    		cout << " sample cell id : " << i  << endl;
+//    		glo_coord = sample_cells[i].get_cell_glob_coord();
+//    		cout << " sample get cell id : " << sample_cells[i].get_cell_id()  << endl;
 //    		cout << " sample cell local coordinate :  [ " <<loc_coord.x<<" "<<loc_coord.y<<" "<<loc_coord.z<<"  ]"<<endl;
+//    		cout << " sample cell global coordinate :  [ " <<glo_coord.x<<" "<<glo_coord.y<<" "<<glo_coord.z<<"  ]"<<endl;
 //    		cout << " no of particles : " << sample_cells[i].get_nparticles() << endl;
+//
+//
+//    		cout << " Inside sample get cell id : " << sample_cells[i].get_cell_id()  << endl;
+//
+//    		for(long j=0;j<sample_cells[i].get_nparticles();j++){
+//				pos_ph = sample_cells[i].get_particle(j).get_myposition();
+//				cout << " particle id : " << j << " "<< " position : "<< pos_ph.x <<" "<<pos_ph.y<<" "<<pos_ph.z<<" "<<endl;
+//			}
+//
 //    	}
 //    	cout << " %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << endl;
+//
+//    	cout << " CPU Cell local coordinates assignments check  " << endl;
+//    	cout << " =====================================================" << endl;
+//
+//
 //    }
 
 
     // choose one cell in random (belong to sample window)
 
+    srand(prank);
 	rand_cell = rand()%sam_cell_counter;
 	cobj = sample_cells[rand_cell];
+
+
 
 	do{
 		//no of particles
@@ -697,12 +681,28 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 		rand_no=(long) rand()%n_particles;
 	}while(cobj.get_particle(rand_no).get_mytype() !=2);
 
+
 	atom = cobj.get_particle(rand_no);
+
+//	cout << "************************************************************" << endl;
+//	cout << " Random generator check    "  << endl;
+//	cout << " my process rank : " << prank << endl;
+//	cout << " Randomly chosen cell no:  "  << rand_cell<< endl;
+//	cout << " Random cell local coordinate :  " <<cobj.get_cell_loc_coord().x<<" "<<cobj.get_cell_loc_coord().y<<" "<<cobj.get_cell_loc_coord().z<<endl;
+//	cout << "  Random cell global coordinate :" <<cobj.get_cell_glob_coord().x<<" "<<cobj.get_cell_glob_coord().y<<" "<<cobj.get_cell_glob_coord().z<<endl;
+//	cout << " Randomly chosen particle index : "<< rand_no << endl;
+//    cout << " Randomly chosen particle id:"  << atom.get_mynumber() << endl;
+//	cout << " Random particle position x :"  << atom.get_myposition().x << endl;
+//	cout << " Random particle position y :"  << atom.get_myposition().y << endl;
+//	cout << " Random particle position z :"  << atom.get_myposition().z << endl;
+//
+//    cout << "************************************************************" << endl;
 
 	return atom;
 }
 
-celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat,int test_rank,ivec3d cpu_dim){
+celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat,
+		int test_rank,ivec3d cpu_dim,double* data_list){
 
 	//########################################################################################################################################################
 	//
@@ -719,13 +719,17 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
 	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
 
+	// TOO BE VERIFIED
+
 	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
 
-//	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
-//	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
+	// Old assignment
+	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
+	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
 
-	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {1,0,0}; ivec3d win_pos_2 = {0,0,1}; ivec3d win_pos_3 = {1,0,1};
-	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {1,1,0}; ivec3d win_pos_6 = {0,1,1}; ivec3d win_pos_7 = {1,1,1};
+	// New assignment
+//	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {1,0,0}; ivec3d win_pos_2 = {0,0,1}; ivec3d win_pos_3 = {1,0,1};
+//	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {1,1,0}; ivec3d win_pos_6 = {0,1,1}; ivec3d win_pos_7 = {1,1,1};
 
 	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
 
@@ -804,8 +808,8 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 	       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,rec_id,1,comm_name,&stat);
 
-	       //neig_coord = get_cpu_gcoord(rec_id,comm_name);
-	       //nb_gcoord[ind][0] = neig_coord.x;  nb_gcoord[ind][1] = neig_coord.y; nb_gcoord[ind][2] = neig_coord.z;
+	       neig_coord = get_cpu_gcoord(rec_id,comm_name);
+	       nb_gcoord[ind][0] = neig_coord.x;  nb_gcoord[ind][1] = neig_coord.y; nb_gcoord[ind][2] = neig_coord.z;
 
 	       if(prank == test_rank){
 	    	   cout << " Process :  " << prank <<" received data from back target process : " << rec_id << endl;
@@ -820,6 +824,10 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	       rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
 
 	       MPI_Recv(rec_pos[ind],3,MPI_DOUBLE,rec_id,0,comm_name,&stat);
+
+	       neig_coord = get_cpu_gcoord(rec_id,comm_name);
+	       nb_gcoord[ind][0] = neig_coord.x;  nb_gcoord[ind][1] = neig_coord.y; nb_gcoord[ind][2] = neig_coord.z;
+
 
 	       if(prank == test_rank){
 	    	   cout << " Process :  " << prank <<" received data from back target process : " << rec_id << endl;
@@ -866,6 +874,9 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 	       MPI_Recv(rec_pos[4],3,MPI_DOUBLE,rec_id,3,comm_name,&stat);
 
+	       neig_coord = get_cpu_gcoord(rec_id,comm_name);
+	       nb_gcoord[4][0] = neig_coord.x;  nb_gcoord[4][1] = neig_coord.y; nb_gcoord[4][2] = neig_coord.z;
+
 	       if(prank == test_rank){
 	    	   cout << " Process :  " << prank <<" received data from left target process : " << rec_id << endl;
 	    	   posit = rec_pos[4];
@@ -887,6 +898,10 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 	       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,rec_id,5,comm_name,&stat);
 
+	       neig_coord = get_cpu_gcoord(rec_id,comm_name);
+	       nb_gcoord[5][0] = neig_coord.x;  nb_gcoord[5][1] = neig_coord.y; nb_gcoord[5][2] = neig_coord.z;
+
+
 	       if(prank == test_rank){
 	    	   cout << " Process :  " << prank <<" received data from bottom - left target process : " << rec_id << endl;
 	    	   posit = rec_pos[5];
@@ -900,6 +915,9 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 		   rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
 		   // right & left comm
 		   MPI_Recv(rec_pos[4],3,MPI_DOUBLE,rec_id,2,comm_name,&stat);
+
+	       neig_coord = get_cpu_gcoord(rec_id,comm_name);
+	       nb_gcoord[4][0] = neig_coord.x;  nb_gcoord[4][1] = neig_coord.y; nb_gcoord[4][2] = neig_coord.z;
 
 	       if(prank == test_rank){
 	    	   cout << " Process :  " << prank <<" received data from left target process : " << rec_id << endl;
@@ -921,6 +939,9 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 	       // top-right & bottom-left comm
 	       MPI_Recv(rec_pos[5],3,MPI_DOUBLE,rec_id,4,comm_name,&stat);
+
+	       neig_coord = get_cpu_gcoord(rec_id,comm_name);
+	       nb_gcoord[5][0] = neig_coord.x;  nb_gcoord[5][1] = neig_coord.y; nb_gcoord[5][2] = neig_coord.z;
 
 	       if(prank == test_rank){
 	    	   cout << " Process :  " << prank <<" received data from bottom - left target process : " << rec_id << endl;
@@ -965,6 +986,9 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 	       MPI_Recv(rec_pos[6],3,MPI_DOUBLE,rec_id,5,comm_name,&stat);
 
+	       neig_coord = get_cpu_gcoord(rec_id,comm_name);
+	       nb_gcoord[6][0] = neig_coord.x;  nb_gcoord[6][1] = neig_coord.y; nb_gcoord[6][2] = neig_coord.z;
+
 	       if(prank == test_rank){
 	    	   cout << " Process :  " << prank <<" received data from top target process : " << rec_id << endl;
 	    	   posit = rec_pos[6];
@@ -976,6 +1000,10 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 		   rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
 		   MPI_Recv(rec_pos[6],3,MPI_DOUBLE,rec_id,4,comm_name,&stat);
+
+	       neig_coord = get_cpu_gcoord(rec_id,comm_name);
+	       nb_gcoord[6][0] = neig_coord.x;  nb_gcoord[6][1] = neig_coord.y; nb_gcoord[6][2] = neig_coord.z;
+
 
 	       if(prank == test_rank){
 	    	   cout << " Process :  " << prank <<" received data from top target process : " << rec_id << endl;
@@ -995,7 +1023,19 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 	if(prank == test_rank){
 		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
+		// neighbor CPU global coordinate check
+		cout <<"***********************************************************"<<endl;
+		for(int i=0; i<7; i++){
+			cout << " nb_gcoord[ "<<i<<" ]  : "<< nb_gcoord[i][0] <<" "<< nb_gcoord[i][1] <<" "<< nb_gcoord[i][2] <<" "<<endl;
+		}
+		cout << " data_list[0]  : " << data_list[0] << endl;
+		cout << " no of cells in CPU  :   " << bobj.get_cell_list_size() << endl;
+		cout << " no of particles in one cell 0  :" << bobj.get_cell(0).get_nparticles()<<endl;
+
+
+		cout <<"***********************************************************"<<endl;
 	}
+
 
 	// synchronize communication
 	MPI_Barrier(comm_name);
@@ -1016,11 +1056,7 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 		// buffer allocation for receive neighbors (NEED REDEFINITION)
 
-		//int buf_count = buffer_size * 10; // buffer_size
-
-		int buf_count = 100;
-
-		//int buf_count = int(data_list[0]) * 10; // buffer_size
+		int buf_count = int(data_list[0]) * 10; // buffer_size
 
 
 		// N1 N2 N4 N6 N3 N5 N7
@@ -1082,8 +1118,8 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	    // y check with N7 ( Neighbor -7)
 	    if( (nb_gcoord[6][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[6][1] = -1;}
 	    if( (nb_gcoord[6][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[6][1] = +1;}
-	//
-	//	// local cell coordinates zone
+
+		// local cell coordinates zone
 	//    ivec3d test, nb_test[19];
 	//
 	//    // window sampling cells (my own cells)

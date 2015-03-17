@@ -15,8 +15,6 @@ vec3d calc_cell_dim(double rsample, vec3d mc_simbox_dim );
 
 vec3d calc_mc_cpu_box_vector(vec3d simbox_vec, int dim);
 
-vec3d* make_mc_tbox_vector(vec3d* simbox,int prank);
-
 ivec3d calc_mc_global_cell_array(vec3d simbox_diag,vec3d cell_dim);
 
 ivec3d calc_mc_cpu_cell_array(vec3d cpubox_diag,vec3d cell_dim, ivec3d cpu_dim,ivec3d global_cell_dim);
@@ -31,12 +29,12 @@ ivec3d calc_cpu_cell_division(vec3d cpu_cd_diag, vec3d cell_dim );
 
 ivec3d get_cell_loc_coord(ivec3d glob_coord, ivec3d cpu_glob_pos, ivec3d cpu_cell_dim );
 
-ivec3d cell_coordinate(double* pos,double* tbox,ivec3d global_cell_dim);
+ivec3d get_particle_glob_coordinate(double* pos,vec3d mc_cell_phy_dim);
 
 cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d gcoord,ivec3d cpu_cell_dim, int prank);
 
-cellblock make_particles(cellblock loc_obj, long tatoms_cpu, double* tbox_dim, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
-		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank,int debug);
+cellblock make_particles(cellblock loc_obj, long tatoms_cpu, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
+		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank,int debug,vec3d cell_dim);
 
 cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  restriction, int prank,int debug);
 
@@ -46,7 +44,8 @@ int get_cpu_rank(int inde0,int inde1,int inde2, MPI_Comm c_name);
 
 particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank);
 
-celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat,int test_rank,ivec3d cpu_dim);
+celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat
+		,int test_rank,ivec3d cpu_dim,double* data_list);
 
 double scalar_prod(vec3d u, vec3d v);
 

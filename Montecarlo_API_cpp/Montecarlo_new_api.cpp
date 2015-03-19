@@ -65,8 +65,10 @@ extern "C" void init_montecarlo(int* md_cpu_dim, int md_tot_types,int md_real_ty
     loc_cell_dim.z = mc_simbox_z.z;
 
 
+    // MonteCarlo cell dimension
+    mc_cell_dim.x = mc_rsweep + mc_sphere_wall ; mc_cell_dim.y = mc_rsweep  + mc_sphere_wall; mc_cell_dim.z = mc_rsweep  + mc_sphere_wall;
 
-    mc_cell_dim.x = mc_rsweep; mc_cell_dim.y = mc_rsweep; mc_cell_dim.z = mc_rsweep;
+    //mc_cell_dim.x = mc_rsweep; mc_cell_dim.y = mc_rsweep; mc_cell_dim.z = mc_rsweep;
 
     // compute cpu box physical dimensions
 
@@ -242,19 +244,16 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int accept_flag = 0; // acceptance flag
 
-	int win_id = 2;  // Hardcoded for testing
+	int win_id = 0;  // Hardcoded for testing
 
 	int test_cpu = 0;
 
 	int dbug_flag = 0;   // debug flag -- print check statements
 
 
-
 	// creating cellblock object
 
 	cellblock c_obj, r_cell,r_partic, r_vel;
-
-
 
 	// CPU box dimension
 	vec3d cpu_box_diag;
@@ -265,8 +264,6 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	c_obj.set_mycpu(mc_prank);
 
-	//c_obj.set_ncells(ncells_cpu);
-
 
 	// construct cells
 
@@ -274,9 +271,6 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 
     // create particles
-
-
-
 
     r_partic = make_particles(r_cell,mc_tatoms_cpu, mc_global_cell_dim,cpu_gcoord,mc_cpu_cell_dim,
         		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot,mc_prank,dbug_flag,mc_cell_dim);
@@ -299,41 +293,29 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 	}
 
 
-    // sample window id(Hard coded for window 0)
     // extend the fragment with random selector
-
     int sample_id= win_id;
 
     // particle instance -- sample zone method
     particle rand_particle = sample_zone(r_partic,sample_id,mc_cpu_cell_dim,mc_prank);
 
-
+    // data_list for sphere construction routine
     double* dat_list;
-    dat_list[0] = (mc_cpu_cell_dim.x/2 * mc_cpu_cell_dim.y/2 * mc_cpu_cell_dim.z/2 );
+    dat_list[0] = (mc_cpu_cell_dim.x/2 * mc_cpu_cell_dim.y/2 * mc_cpu_cell_dim.z/2 ); // no of cells
+    dat_list[1] = mc_rsweep;        // sphere radius
+    dat_list[2] = mc_sphere_wall;   // sphere wall thickness
+    dat_list[3] = mc_simbox_x.x;
+    dat_list[4] = mc_simbox_y.y;
+    dat_list[5] = mc_simbox_z.z;
 
     // construct sphere
-    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list);
+    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,mc_cpu_cell_dim);
 
-    //construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat)
 
 	// debug/control checking part
 
     if(mc_prank == 0){
 
-	   /*
-	   ivec3d check_cell_gc = r_cell.get_cell(100).get_cell_glob_coord();
-	   ivec3d check_cell_lc = r_cell.get_cell(100).get_cell_loc_coord();
-       cout << "================================================" << endl;
-	   cout << "               From do_montecarlo after  make_cells             "  << endl;
-	   cout << "               cell block object check         "  << endl;
-	   //cout << " ncells_cpu : " << ncells_cpu << endl;
-	   cout << "  c_obj.get_mycpu()       " << r_cell.get_mycpu() << endl;
-       cout << "  c_obj.get_cell_list_size()      " << r_cell.get_cell_list_size() << endl;
-       cout << "    cell[100]     check     "  <<  endl;
-	   cout << "  cell glob coord : [  " << check_cell_gc.x<< " "<<check_cell_gc.y<<" "<<check_cell_gc.z<<" ]"<<endl;
-	   cout << "  cell loca coord : [  " << check_cell_lc.x<< " "<<check_cell_lc.y<<" "<<check_cell_lc.z<<" ]"<<endl;
-       cout << "================================================" << endl;
-       */
 
        long tot_particles=0; // check variable
        cout << "****************************************************" << endl;

@@ -594,7 +594,6 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 
 
     // sample cell ranges
-    //ivec6d zone_limit_0 = {0,4,0,4,0,1}; // window 0
 
     ivec6d zone_limit_0 = {x_start,x_mid-1,y_start,y_mid-1,z_start,z_mid-1}; // window 0
     ivec6d zone_limit_1 = {x_start,x_mid-1,y_start,y_mid-1,z_mid,z_end-1};   // window 1
@@ -702,7 +701,7 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 }
 
 celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat,
-		int test_rank,ivec3d cpu_dim,double* data_list){
+		int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim){
 
 	//########################################################################################################################################################
 	//
@@ -1047,270 +1046,378 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 //
 //########################################################################################################################################################
 
-		// flags for coordinate shifting (if they are on edges!!)
-	    int flag [7][3]; // [neighbor] [x y z]
+    // defining zone limits
+    int x_start=0,  x_mid = cpu_cell_dim.x/2,    x_end = cpu_cell_dim.x;   // zone limit parameters in x direction
+    int y_start=0,  y_mid = cpu_cell_dim.y/2,    y_end = cpu_cell_dim.y;   // zone limit parameters in y direction
+    int z_start=0,  z_mid = cpu_cell_dim.z/2,    z_end = cpu_cell_dim.z;   // zone limit parameters in z direction
 
-	    // global cpu array dimension range
-	  	ivec3d cpu_max = {cpu_dim.x-1,cpu_dim.y-1,cpu_dim.z-1};            // dimension - Max
-	    ivec3d cpu_min = {0,0,0};                                          // dimension - Min
+    // sample cell ranges
 
-		// buffer allocation for receive neighbors (NEED REDEFINITION)
+    ivec6d zone_limit_0 = {x_start,x_mid-1,y_start,y_mid-1,z_start,z_mid-1}; // window 0
+    ivec6d zone_limit_1 = {x_start,x_mid-1,y_start,y_mid-1,z_mid,z_end-1};   // window 1
+    ivec6d zone_limit_2 = {x_mid,x_end-1,y_start,y_mid-1,z_start,z_mid-1};   // window 2
+    ivec6d zone_limit_3 = {x_mid,x_end-1,y_start,y_mid-1,z_mid,z_end-1};     // window 3
 
-		int buf_count = int(data_list[0]) * 10; // buffer_size
+    ivec6d zone_limit_4 = {x_start,x_mid-1,y_mid,y_end-1,z_start,z_mid-1}; // window 4
+    ivec6d zone_limit_5 = {x_start,x_mid-1,y_mid,y_end-1,z_mid,z_end-1};   // window 5
+    ivec6d zone_limit_6 = {x_mid,x_end-1,y_mid,y_end-1,z_start,z_mid-1};   // window 6
+    ivec6d zone_limit_7 = {x_mid,x_end-1,y_mid,y_end-1,z_mid,z_end-1};     // window 7
 
+    ivec6d zone_limit[8]={zone_limit_0,zone_limit_1,zone_limit_2,zone_limit_3,zone_limit_4,zone_limit_5,zone_limit_6,zone_limit_7};
 
-		// N1 N2 N4 N6 N3 N5 N7
-		double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
+	// flags for coordinate shifting (if they are on edges!!)
+	int flag [7][3]; // [neighbor] [x y z]
 
-		// allocate memory (to send to neighbors)
-		nb_0 = new double [buf_count]; nb_1= new double [buf_count]; nb_2 = new double [buf_count];
-		nb_3 = new double [buf_count]; nb_4= new double [buf_count]; nb_5 = new double [buf_count];
-		nb_6 = new double [buf_count];
+	// global cpu array dimension range
+	ivec3d cpu_max = {cpu_dim.x-1,cpu_dim.y-1,cpu_dim.z-1};            // dimension - Max
+	ivec3d cpu_min = {0,0,0};                                          // dimension - Min
 
-		double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
-
-		double *my_0, *my_1, *my_2, *my_3, *my_4, *my_5, *my_6; // to be received and filled in sphere cells
-
-		// allocate memory (to receive from neighbors)
-		my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
-		my_3 = new double [buf_count]; my_4= new double [buf_count]; my_5 = new double [buf_count];
-		my_6 = new double [buf_count];
-
-		double* my_buffer[7] = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
-
-
-	    // boundary checks and flag assignments (ENSURE COORDINATES SHIFT IF REQUIRED)
-
-	    // z check  with  N1 ( Neighbor -1)
-	    if( (nb_gcoord[0][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[0][2] = -1;}
-	    if( (nb_gcoord[0][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[0][2] = +1;}
-
-	    // x-z check with N2 ( Neighbor -2)
-	    if( (nb_gcoord[1][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[1][0] = -1;}
-	    if( (nb_gcoord[1][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[1][0] = +1;}
-	    if( (nb_gcoord[1][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[1][2] = -1;}
-	    if( (nb_gcoord[1][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[1][2] = +1;}
-
-	    // x-y-z check with N4 ( Neighbor -3)
-	    if( (nb_gcoord[2][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[2][0] = -1;}
-	    if( (nb_gcoord[2][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[2][0] = +1;}
-	    if( (nb_gcoord[2][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[2][1] = -1;}
-	    if( (nb_gcoord[2][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[2][1] = +1;}
-	    if( (nb_gcoord[2][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[2][2] = -1;}
-	    if( (nb_gcoord[2][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[2][2] = +1;}
-
-	    // y-z check with N6 ( Neighbor -4)
-	    if( (nb_gcoord[3][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[3][1] = -1;}
-	    if( (nb_gcoord[3][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[3][1] = +1;}
-	    if( (nb_gcoord[3][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[3][2] = -1;}
-	    if( (nb_gcoord[3][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[3][2] = +1;}
-
-	    // x check with N3  ( Neighbor -5)
-	    if( (nb_gcoord[4][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[4][0] = -1;}
-	    if( (nb_gcoord[4][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[4][0] = +1;}
-
-	    // x-y check with N5 ( Neighbor -6)
-	    if( (nb_gcoord[5][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[5][0] = -1;}
-	    if( (nb_gcoord[5][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[5][0] = +1;}
-	    if( (nb_gcoord[5][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[5][1] = -1;}
-	    if( (nb_gcoord[5][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[5][1] = +1;}
-
-	    // y check with N7 ( Neighbor -7)
-	    if( (nb_gcoord[6][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[6][1] = -1;}
-	    if( (nb_gcoord[6][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[6][1] = +1;}
-
-		// local cell coordinates zone
-	//    ivec3d test, nb_test[19];
-	//
-	//    // window sampling cells (my own cells)
-	//    // later generalize for more than 8 cells
-	//
-	//    celltype sample_cells[8];
-	//
-	//    // ***************************************************************************
-	//    //window neighbor cells (to be sent)
-	//    // no of each neighbor cells ( N1 N2 N4 N6 N3 N5 N7 )
-	//    // to be generalized later
-	//    int neig_cells_size [7]={4,2,1,2,4,2,4};
-	//
-	//    // (Check this for generality)
-	//    //****************************************************************************
-	//
-	//    // list of neighbor receive cells
-	//    celltype neighb[19];
-	//
-	//    // total cells in cpu block
-	//    long ncells= bobj.get_ncells();
-	//
-	//    // variables for neighbor cell ranges
-	//    int nb_xmin, nb_ymin, nb_zmin, nb_xmax, nb_ymax, nb_zmax, nb_x, nb_y, nb_z;
-	//
-	//    // assign neighbor cell ranges
-	//    nb_xmin = zone_limit[win_id].xmin; nb_xmax = zone_limit[win_id].xmax;
-	//    nb_ymin = zone_limit[win_id].ymin; nb_ymax = zone_limit[win_id].ymax;
-	//    nb_zmin = zone_limit[win_id].zmin; nb_zmax = zone_limit[win_id].zmax;
-	//
-	//    // Neighbor cells to be communicated as per sample window position
-	//    if(nb_xmax ==1) {nb_x = 2;}
-	//    else{ nb_x=0; }
-	//
-	//    if(nb_ymax ==1) {nb_y = 2;}
-	//    else{ nb_y=0; }
-	//
-	//    if(nb_zmax ==1) {nb_z = 2;}
-	//    else{ nb_z=0; }
-	//
-	//    // prepare NEIGHBOR cell list as per sample window id
-	//    //Neighbor-1 (N1)
-	//    nb_test[0].x =nb_xmin; nb_test[0].y = nb_ymin; nb_test[0].z = nb_z;    neighb[0] = bobj.cell_with_lcoord(nb_test[0],ncells);
-	//    nb_test[1].x =nb_xmax; nb_test[1].y = nb_ymin; nb_test[1].z = nb_z;    neighb[1] = bobj.cell_with_lcoord(nb_test[1],ncells);
-	//    nb_test[2].x =nb_xmin; nb_test[2].y = nb_ymax; nb_test[2].z = nb_z;    neighb[2] = bobj.cell_with_lcoord(nb_test[2],ncells);
-	//    nb_test[3].x =nb_xmax; nb_test[3].y = nb_ymax; nb_test[3].z = nb_z;    neighb[3] = bobj.cell_with_lcoord(nb_test[3],ncells);
-	//
-	//
-	////      conceptual idea
-	////	    //updating cell
-	////	    bobj.delete_cell(bobj.cell_with_lcoord(nb_test[0],ncells).get_cell_id());
-	////
-	////	    bobj.add_cell(neighb[0]);
-	//
-	//    //Neighbor-2 (N2)
-	//    nb_test[4].x = nb_x; nb_test[4].y = nb_ymin; nb_test[4].z = nb_z;      neighb[4] = bobj.cell_with_lcoord(nb_test[4],ncells);
-	//    nb_test[5].x = nb_x; nb_test[5].y = nb_ymax; nb_test[5].z = nb_z;      neighb[5] = bobj.cell_with_lcoord(nb_test[5],ncells);
-	//
-	//    //Neighbor-3 (N4)
-	//    nb_test[6].x = nb_x; nb_test[6].y = nb_y;    nb_test[6].z = nb_z;      neighb[6] = bobj.cell_with_lcoord(nb_test[6],ncells);
-	//
-	//    //Neighbor-4 (N6)
-	//    nb_test[7].x = nb_xmin; nb_test[7].y = nb_y; nb_test[7].z = nb_z;      neighb[7] = bobj.cell_with_lcoord(nb_test[7],ncells);
-	//    nb_test[8].x = nb_xmax; nb_test[8].y = nb_y; nb_test[8].z = nb_z;      neighb[8] = bobj.cell_with_lcoord(nb_test[8],ncells);
-	//
-	//    //Neighbor-5 (N3)
-	//    nb_test[9].x =nb_x;   nb_test[9].y = nb_ymin; nb_test[9].z = nb_zmin;  neighb[9] = bobj.cell_with_lcoord(nb_test[9],ncells);
-	//    nb_test[10].x =nb_x; nb_test[10].y = nb_ymin; nb_test[10].z = nb_zmax; neighb[10]= bobj.cell_with_lcoord(nb_test[10],ncells);
-	//    nb_test[11].x =nb_x; nb_test[11].y = nb_ymax; nb_test[11].z = nb_zmin; neighb[11]= bobj.cell_with_lcoord(nb_test[11],ncells);
-	//    nb_test[12].x =nb_x; nb_test[12].y = nb_ymax; nb_test[12].z = nb_zmax; neighb[12]= bobj.cell_with_lcoord(nb_test[12],ncells);
-	//
-	//    //Neighbor-6 (N5)
-	//    nb_test[13].x = nb_x; nb_test[13].y = nb_y; nb_test[13].z = nb_zmin;   neighb[13] = bobj.cell_with_lcoord(nb_test[13],ncells);
-	//    nb_test[14].x = nb_x; nb_test[14].y = nb_y; nb_test[14].z = nb_zmax;   neighb[14] = bobj.cell_with_lcoord(nb_test[14],ncells);
-	//
-	//    //Neighbor-7 (N7)
-	//    nb_test[15].x =nb_xmin; nb_test[15].y = nb_y; nb_test[15].z = nb_zmin; neighb[15] = bobj.cell_with_lcoord(nb_test[15],ncells);
-	//    nb_test[16].x =nb_xmin; nb_test[16].y = nb_y; nb_test[16].z = nb_zmax; neighb[16] = bobj.cell_with_lcoord(nb_test[16],ncells);
-	//    nb_test[17].x =nb_xmax; nb_test[17].y = nb_y; nb_test[17].z = nb_zmin; neighb[17] = bobj.cell_with_lcoord(nb_test[17],ncells);
-	//    nb_test[18].x =nb_xmax; nb_test[18].y = nb_y; nb_test[18].z = nb_zmax; neighb[18] = bobj.cell_with_lcoord(nb_test[18],ncells);
-	//
-	//    //***************************************************************************
-	//    //                  My received neighbor part - fill buffers for my neighbors
-	//    //***************************************************************************
-	//
-	//    // sweep distance computation (with squares)
-	//    double r_full   = pow((mc_rsweep + mc_sphere_wall),2.0);
-	//    double r_sphere = pow(mc_rsweep,2.0);
-	//
-	//    vec3d ref_pos, curr_pos;                       // reference/current particle position
-	//
-	//    // temporary holder for particle attributes
-	//	double temp_id; double temp_type;
-	//	double temp_mass, temp_epot, dist_check;
-	//	vec3d temp_pos, temp_vel;
-	//
-	//	long total_particles=0;                       // counter for total particle no in buffers
-	//    int ind =0;                                   // neighbor cell counter
-	//    long buf_counter,part_count;
-	//
-	//    for(int j=0; j<7;j++ ){ // loop over all neighbor cpu
-	//    	    buf_counter=1;
-	//    	    // get received neighbor chosen particle positions
-	//    	    ref_pos.x = *rec_pos[j+0]; ref_pos.y = *rec_pos[j+1]; ref_pos.z = *rec_pos[j+2];
-	//
-	//    	    for (int k=0; k<neig_cells_size[j]; k++){ // loop over each neighbor sub total
-	//    	         part_count = neighb[ind].get_nparticles(); //get total particles
-	//
-	//    	         for (long val=0;val<part_count;val++){ // loop over particles in each neighbor cell
-	//	    		          curr_pos =neighb[ind].get_particle(val).get_myposition();
-	//	    		          // coordinate shifting as per flag initialization(for cells on edges of CPU)
-	//	    		          curr_pos.x = curr_pos.x + (flag[j][0] * mc_simbox_x.x);
-	//	    		          curr_pos.y = curr_pos.y + (flag[j][1] * mc_simbox_y.y);
-	//	    		          curr_pos.z = curr_pos.z + (flag[j][2] * mc_simbox_z.z);
-	//
-	//	    		          dist_check = distance_vect(ref_pos,curr_pos);
-	//	    		          // ----- cutoff check
-	//	    		          if(dist_check <= r_full ){
-	// 		    		            // declare virtual particles on sphere boundary
-	//     	    		            if( dist_check > r_sphere ){
-	//     	    			             temp_type = (double) neighb[ind].get_particle(val).get_mytype();
-	//
-	//     	    			             // ignore placeholders on sphere wall
-	//	    			                 if (temp_type != (double) 2 ) { // HC: now hardcoded for placeholders
-	//
-	//	    			        	           temp_id     = (double) (neighb[ind].get_particle(val).get_mynumber());
-	//
-	//	    			        	           // add particle id that are sent for sphere constructions
-	//	    			        	           list_ids[j].push_back(temp_id);
-	//
-	//	    			        	           temp_type   = (double) (temp_type + mc_real_types);
-	//                                           temp_mass   =  neighb[ind].get_particle(val).get_mymass();
-	//
-	//                                           // assign temporary position (coordinates shifted if neighbors on cpu boundary)
-	//                                           temp_pos  =  curr_pos;
-	//                                           temp_vel  =  neighb[ind].get_particle(val).get_myvelocity();
-	//                                           temp_epot =  neighb[ind].get_particle(val).get_myepot();
-	//
-	//                                           // *************************************************
-	//                                           // CRITICAL PART
-	//                                           // *************************************************
-	//
-	//                                           // ADD TO BUFFER nb_buffer
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_id;
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_type;
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_mass;
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.x;
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.y;
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.z;
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.x;
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.y;
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.z;
-	//                                           *(nb_buffer[j]+buf_counter++)  = temp_epot;
-	//	    			                 }
-	//	    		                }
-	//	    		                else{ // include all particles inside mc_rsweep
-	//
-	// 			        	            temp_id     = (double) (neighb[ind].get_particle(val).get_mynumber());
-	// 			        	            temp_type   = (double) (neighb[ind].get_particle(val).get_mytype());
-	//                                    temp_mass   =  neighb[ind].get_particle(val).get_mymass();
-	//                                    // assign temporary position (coordinates shifted if neighbors on cpu boundary)
-	//                                    temp_pos  =  curr_pos;
-	//                                    temp_vel  =  neighb[ind].get_particle(val).get_myvelocity();
-	//                                    temp_epot =  neighb[ind].get_particle(val).get_myepot();
-	//
-	//                                    // ADD TO BUFFER nb_nb_buffer_0
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_id;
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_type;
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_mass;
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_pos.x;
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_pos.y;
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_pos.z;
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_vel.x;
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_vel.y;
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_vel.z;
-	//                                    *(nb_buffer[j]+buf_counter++) = temp_epot;
-	//
-	//	             	            }
-	//
-	//	                      }  // cut-off check
-	//	    	     } //  end of particles loop
-	//	    	     ind++; // neighbor cells counter
-	//
-	//    	    } // loop over each neighbor sub total
-	//    	    // no of particles in each neighbor buffer
-	//    	    total_particles = (buf_counter-1) * 0.1 ;     //10 attributes for each particle
-	//            *(nb_buffer[j])  = (double) total_particles;  // each buffer first location has particles count
-	//
-	//	} // end of Neighbor cpu loop
+//	// buffer allocation for receive neighbors (NEED REDEFINITION)
+//
+//	int buf_count = int(data_list[0]) * 10; // buffer_size
+//
+//	// N1 N2 N4 N6 N3 N5 N7
+//	double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
+//
+//	// allocate memory (to send to neighbors)
+//	nb_0 = new double [buf_count]; nb_1= new double [buf_count]; nb_2 = new double [buf_count];
+//	nb_3 = new double [buf_count]; nb_4= new double [buf_count]; nb_5 = new double [buf_count];
+//	nb_6 = new double [buf_count];
+//
+//	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
+//
+//	double *my_0, *my_1, *my_2, *my_3, *my_4, *my_5, *my_6; // to be received and filled in sphere cells
+//
+//	// allocate memory (to receive from neighbors)
+//	my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
+//	my_3 = new double [buf_count]; my_4= new double [buf_count]; my_5 = new double [buf_count];
+//	my_6 = new double [buf_count];
+//
+//	double* my_buffer[7] = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
 
 
+	// boundary checks and flag assignments (ENSURE COORDINATES SHIFT IF REQUIRED)
+
+	//flag[0][2] = window_position[win_id].z + (nb_gcoord[0][2] cpu_max.z)
+	// NEED BETTER IMPLEMENTATION
+	// z check  with  N1 ( Neighbor -1)
+	if( (nb_gcoord[0][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[0][2] = -1;}
+	if( (nb_gcoord[0][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[0][2] = +1;}
+
+
+	// x-z check with N2 ( Neighbor -2)
+	if( (nb_gcoord[1][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[1][0] = -1;}
+	if( (nb_gcoord[1][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[1][0] = +1;}
+	if( (nb_gcoord[1][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[1][2] = -1;}
+	if( (nb_gcoord[1][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[1][2] = +1;}
+
+	// x-y-z check with N4 ( Neighbor -3)
+	if( (nb_gcoord[2][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[2][0] = -1;}
+	if( (nb_gcoord[2][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[2][0] = +1;}
+	if( (nb_gcoord[2][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[2][1] = -1;}
+	if( (nb_gcoord[2][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[2][1] = +1;}
+	if( (nb_gcoord[2][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[2][2] = -1;}
+	if( (nb_gcoord[2][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[2][2] = +1;}
+
+	// y-z check with N6 ( Neighbor -4)
+	if( (nb_gcoord[3][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[3][1] = -1;}
+	if( (nb_gcoord[3][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[3][1] = +1;}
+	if( (nb_gcoord[3][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[3][2] = -1;}
+	if( (nb_gcoord[3][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[3][2] = +1;}
+
+	// x check with N3  ( Neighbor -5)
+	if( (nb_gcoord[4][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[4][0] = -1;}
+	if( (nb_gcoord[4][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[4][0] = +1;}
+
+	// x-y check with N5 ( Neighbor -6)
+	if( (nb_gcoord[5][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[5][0] = -1;}
+	if( (nb_gcoord[5][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[5][0] = +1;}
+	if( (nb_gcoord[5][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[5][1] = -1;}
+	if( (nb_gcoord[5][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[5][1] = +1;}
+
+	// y check with N7 ( Neighbor -7)
+	if( (nb_gcoord[6][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[6][1] = -1;}
+	if( (nb_gcoord[6][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[6][1] = +1;}
+
+	// variables for neighbor cell ranges
+	int nb_xmin, nb_ymin, nb_zmin, nb_xmax, nb_ymax, nb_zmax, nb_x, nb_y, nb_z;
+
+    ivec3d test;
+
+    // Neighbor cells to be communicated as per sample window position
+    // assign neighbor cell ranges (as per window position)
+	nb_xmin = zone_limit[win_id].xmin; nb_xmax = zone_limit[win_id].xmax;
+	nb_ymin = zone_limit[win_id].ymin; nb_ymax = zone_limit[win_id].ymax;
+	nb_zmin = zone_limit[win_id].zmin; nb_zmax = zone_limit[win_id].zmax;
+
+	// as window chosen on one corner of CPU; then cells on other corner for particular direction should be selected.
+
+	// Maximum of CPU cell dimension
+	ivec3d glob_c_dim = {cpu_cell_dim.x-1,cpu_cell_dim.y-1,cpu_cell_dim.z-1};
+
+	nb_x = glob_c_dim.x - (window_position[win_id].x * glob_c_dim.x );
+	nb_y = glob_c_dim.y - (window_position[win_id].y * glob_c_dim.y );
+	nb_z = glob_c_dim.z - (window_position[win_id].z * glob_c_dim.z );
+
+    // List of neighbor cells to be exported
+	vector<celltype> nb_cells;
+	long ncells = bobj.get_cell_list_size();
+
+	// cell counters for neighbor communications
+	int count_1=0, count_2=0, count_3=0, count_4=0, count_5=0, count_6=0, count_7=0;
+
+	// particle counters for neighbor communications
+    long tot_part_1 =0, tot_part_2 =0, tot_part_3 =0, tot_part_4 =0, tot_part_5 =0, tot_part_6 =0, tot_part_7 =0;
+
+
+	// prepare NEIGHBOR cell list (to export) as per sample window id
+
+	// Neighbor-1 (N1) (z direction)
+    for(int i=nb_xmin;i<=nb_xmax;i++){
+    	for(int j=nb_ymin;j<=nb_ymax;j++){
+    			test.x = i; test.y = j; test.z = nb_z;
+    			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
+    			tot_part_1 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+    			count_1++;
+    	}
+    }
+
+    // Neighbor-2 (N2) ( x-z direction)
+	for(int j=nb_ymin;j<=nb_ymax;j++){
+			test.x = nb_x; test.y = j; test.z = nb_z;
+			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
+			tot_part_2 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+			count_2++;
+	}
+
+	//Neighbor-3 (N4) (x-y-z direction)
+	test.x = nb_x; test.y = nb_y; test.z = nb_z;
+	nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
+	tot_part_3 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+	count_3++;
+
+	//Neighbor-4 (N6) (y-z direction)
+	for(int i=nb_xmin;i<=nb_xmax;i++){
+			test.x = i; test.y = nb_y; test.z = nb_z;
+			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
+			tot_part_4 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+			count_4++;
+	}
+
+	//    //Neighbor-5 (N3) (x direction)
+    for(int j=nb_ymin;j<=nb_ymax;j++){
+    	for(int k=nb_zmin; k<=nb_zmax; k++){
+    			test.x = nb_x; test.y = j; test.z = k;
+    			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
+    			tot_part_5 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+    			count_5++;
+    	}
+    }
+
+	//    //Neighbor-6 (N5) (x-y direction)
+	for(int k=nb_zmin;k<=nb_zmax;k++){
+			test.x = nb_x; test.y = nb_y; test.z = k;
+			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
+			tot_part_6 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+			count_6++;
+	}
+
+    //    //Neighbor-7 (N7) (y direction)
+    for(int i=nb_xmin;i<=nb_xmax;i++){
+    	for(int k=nb_zmin; k<=nb_zmax; k++){
+    			test.x = i; test.y = nb_y; test.z = k;
+    			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
+    			tot_part_7 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+    			count_7++;
+    	}
+    }
+
+    int count_list[7]     = {count_1,count_2,count_3,count_4,count_5,count_6,count_7};                      // list of neighbor export cells counter
+    long tot_part_list[7] = {tot_part_1,tot_part_2,tot_part_3,tot_part_4,tot_part_5,tot_part_6,tot_part_7}; // list of neighbor export particles counter
+
+
+    if (prank == test_rank){
+       ivec3d nb_g_coord;
+       cout << " **************************************************** " << endl;
+       cout << " After allocation check : Neighbor cells  " << endl;
+       cout << " nb_cells.size() " << nb_cells.size()<< endl;
+
+       cout << " neighbor cells counter check " << endl;
+
+       for(int i=0;i<7;i++){
+    	   cout << " Neighbor "<< i<<" cell export count " << count_list[i] << "  particle export count   "<<tot_part_list[i]<< endl;
+       }
+
+       cout << "  Neighbor cells coordinate check " << endl;
+
+       for(int i=0; i<nb_cells.size(); i++){
+    	    nb_g_coord = nb_cells[i].get_cell_glob_coord();
+    	    cout <<" cell count " << i <<" " << "glob coordinate "<< nb_g_coord.x <<" "<< nb_g_coord.y<<" "<< nb_g_coord.z << endl;
+
+       }
+
+       cout << " **************************************************** " << endl;
+    }
+
+	//***************************************************************************
+	//                  My received neighbor part - fill buffers for my neighbors
+	//***************************************************************************
+
+
+	// buffer allocation for receive neighbors (NEED REDEFINITION)
+
+	int buf_count = int(data_list[0]) * 10; // buffer_size
+
+	// N1 N2 N4 N6 N3 N5 N7
+	double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
+
+	// allocate memory (to send to neighbors)
+//	nb_0 = new double [buf_count]; nb_1= new double [buf_count]; nb_2 = new double [buf_count];
+//	nb_3 = new double [buf_count]; nb_4= new double [buf_count]; nb_5 = new double [buf_count];
+//	nb_6 = new double [buf_count];
+
+	nb_0 = new double [tot_part_1*10]; nb_1= new double [tot_part_2*10]; nb_2 = new double [tot_part_3*10];
+	nb_3 = new double [tot_part_4*10]; nb_4= new double [tot_part_5*10]; nb_5 = new double [tot_part_6*10];
+	nb_6 = new double [tot_part_7*10];
+
+	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
+
+
+    double rsweep      = data_list[1];  // sphere radius
+    double sphere_wall = data_list[2];  // wall thickness
+
+    // sweep distance computation (with squares)
+	double r_full   = pow((rsweep + sphere_wall),2.0);
+	double r_sphere = pow(rsweep,2.0);
+
+	vec3d ref_pos, curr_pos;                       // reference/current particle position
+
+	// temporary holder for particle attributes
+	double temp_id; double temp_type;
+	double temp_mass, temp_epot, dist_check;
+	vec3d temp_pos, temp_vel,simbox_size;
+
+	simbox_size.x = data_list[3];
+	simbox_size.y = data_list[4];
+	simbox_size.z = data_list[5];
+
+
+	long total_particles=0;                       // counter for total particle no in buffers
+	int ind =0;                                   // neighbor cell counter
+	long buf_counter,part_count;
+
+
+
+	int nb_ptr=0;
+
+//	for(int j=0; j<7;j++ ){ // loop over all neighbor CPU
+//	    buf_counter=1;
+//
+//	    // get received neighbor chosen particle position
+//	    ref_pos.x = *rec_pos[j+0]; ref_pos.y = *rec_pos[j+1]; ref_pos.z = *rec_pos[j+2];
+//
+//	    for(int k=nb_ptr; k<(nb_ptr+count_list[j]); k++){ // loop over each neighbor  total export cells
+//
+//	    	    nb_ptr = count_list[j]; // updating neigbor pointer
+//
+//	    	    part_count = nb_cells[k].get_nparticles(); //get total particles
+//
+//	    	    for (long val=0; val<part_count; val++){ // loop over particles in each neighbor cell
+//
+//		    		          curr_pos = nb_cells[k].get_particle(val).get_myposition();
+//
+//		    		          // coordinate shifting as per flag initialization(for cells on edges of CPU)
+//		    		          curr_pos.x = curr_pos.x + (flag[j][0] * simbox_size.x);
+//		    		          curr_pos.y = curr_pos.y + (flag[j][1] * simbox_size.y);
+//		    		          curr_pos.z = curr_pos.z + (flag[j][2] * simbox_size.z);
+//
+//		    		          dist_check = distance_vect(ref_pos,curr_pos);
+//		    		          // ----- cutoff check
+//		    		          if(dist_check <= r_full ){
+//
+//	 		    		            // declare virtual particles on sphere boundary
+//	     	    		            if( dist_check > r_sphere ){
+//	     	    			             temp_type = (double) nb_cells[k].get_particle(val).get_mytype();
+//
+//	     	    			             // ignore placeholders on sphere wall
+//		    			                 if (temp_type != (double) 2 ) { // HC: now hardcoded for placeholders
+//
+//		    			        	           temp_id     = (double) (nb_cells[k].get_particle(val).get_mynumber());
+//
+//		    			        	           // add particle id that are sent for sphere constructions
+//		    			        	           list_ids[j].push_back(temp_id);
+//
+//		    			        	           temp_type   = (double) (temp_type + mc_real_types);
+//	                                           temp_mass   =  nb_cells[k].get_particle(val).get_mymass();
+//
+//	                                           // assign temporary position (coordinates shifted if neighbors on cpu boundary)
+//	                                           temp_pos  =  curr_pos;
+//	                                           temp_vel  =  nb_cells[k].get_particle(val).get_myvelocity();
+//	                                           temp_epot =  nb_cells[k].get_particle(val).get_myepot();
+//
+//	                                           // *************************************************
+//	                                           // CRITICAL PART
+//	                                           // *************************************************
+//
+//	                                           // ADD TO BUFFER nb_buffer
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_id;
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_type;
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_mass;
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.x;
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.y;
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.z;
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.x;
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.y;
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.z;
+//	                                           *(nb_buffer[j]+buf_counter++)  = temp_epot;
+//		    			                 }
+//		    		                }
+//		    		                else{ // include all particles inside mc_rsweep
+//
+//	 			        	            temp_id     = (double) (nb_cells[k].get_particle(val).get_mynumber());
+//	 			        	            temp_type   = (double) (nb_cells[k].get_particle(val).get_mytype());
+//	                                    temp_mass   =  nb_cells[k].get_particle(val).get_mymass();
+//
+//	                                    // assign temporary position (coordinates shifted if neighbors on cpu boundary)
+//	                                    temp_pos  =  curr_pos;
+//	                                    temp_vel  =  nb_cells[k].get_particle(val).get_myvelocity();
+//	                                    temp_epot =  nb_cells[k].get_particle(val).get_myepot();
+//
+//	                                    // ADD TO BUFFER nb_nb_buffer_0
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_id;
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_type;
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_mass;
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.x;
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.y;
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.z;
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.x;
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.y;
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.z;
+//	                                    *(nb_buffer[j]+buf_counter++) = temp_epot;
+//
+//		             	            }
+//
+//		                      }  // cut-off check
+//		    	     } //  end of particles loop
+//		    	     ind++; // neighbor cells counter
+//
+//	    	    } // loop over each neighbor sub total
+//	    	    // no of particles in each neighbor buffer
+//	    	    total_particles = (buf_counter-1) * 0.1 ;     //10 attributes for each particle
+//	            *(nb_buffer[j])  = (double) total_particles;  // each buffer first location has particles count
+//
+//		} // end of Neighbor cpu loop
+
+
+
+	double *my_0, *my_1, *my_2, *my_3, *my_4, *my_5, *my_6; // to be received and filled in sphere cells
+
+	// allocate memory (to receive from neighbors)
+	my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
+	my_3 = new double [buf_count]; my_4= new double [buf_count]; my_5 = new double [buf_count];
+	my_6 = new double [buf_count];
+
+	double* my_buffer[7] = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
 
 
 	return sphere_old;

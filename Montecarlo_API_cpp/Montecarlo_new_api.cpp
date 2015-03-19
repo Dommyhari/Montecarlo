@@ -246,7 +246,7 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int win_id = 0;  // Hardcoded for testing
 
-	int test_cpu = 0;
+	int test_cpu = 1;
 
 	int dbug_flag = 0;   // debug flag -- print check statements
 
@@ -307,6 +307,8 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     dat_list[3] = mc_simbox_x.x;
     dat_list[4] = mc_simbox_y.y;
     dat_list[5] = mc_simbox_z.z;
+    dat_list[6] = (double) mc_real_types;
+
 
     // construct sphere
     celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,mc_cpu_cell_dim);

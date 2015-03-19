@@ -1067,34 +1067,13 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 	// flags for coordinate shifting (if they are on edges!!)
 	int flag [7][3]; // [neighbor] [x y z]
+	for(int i=0;i<7;i++){
+		flag [i][0] = 0; flag [i][1] = 0; flag [i][2] = 0;
+	}
 
 	// global cpu array dimension range
 	ivec3d cpu_max = {cpu_dim.x-1,cpu_dim.y-1,cpu_dim.z-1};            // dimension - Max
 	ivec3d cpu_min = {0,0,0};                                          // dimension - Min
-
-//	// buffer allocation for receive neighbors (NEED REDEFINITION)
-//
-//	int buf_count = int(data_list[0]) * 10; // buffer_size
-//
-//	// N1 N2 N4 N6 N3 N5 N7
-//	double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
-//
-//	// allocate memory (to send to neighbors)
-//	nb_0 = new double [buf_count]; nb_1= new double [buf_count]; nb_2 = new double [buf_count];
-//	nb_3 = new double [buf_count]; nb_4= new double [buf_count]; nb_5 = new double [buf_count];
-//	nb_6 = new double [buf_count];
-//
-//	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
-//
-//	double *my_0, *my_1, *my_2, *my_3, *my_4, *my_5, *my_6; // to be received and filled in sphere cells
-//
-//	// allocate memory (to receive from neighbors)
-//	my_0 = new double [buf_count]; my_1= new double [buf_count]; my_2 = new double [buf_count];
-//	my_3 = new double [buf_count]; my_4= new double [buf_count]; my_5 = new double [buf_count];
-//	my_6 = new double [buf_count];
-//
-//	double* my_buffer[7] = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
-
 
 	// boundary checks and flag assignments (ENSURE COORDINATES SHIFT IF REQUIRED)
 
@@ -1236,28 +1215,28 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
     long tot_part_list[7] = {tot_part_1,tot_part_2,tot_part_3,tot_part_4,tot_part_5,tot_part_6,tot_part_7}; // list of neighbor export particles counter
 
 
-    if (prank == test_rank){
-       ivec3d nb_g_coord;
-       cout << " **************************************************** " << endl;
-       cout << " After allocation check : Neighbor cells  " << endl;
-       cout << " nb_cells.size() " << nb_cells.size()<< endl;
-
-       cout << " neighbor cells counter check " << endl;
-
-       for(int i=0;i<7;i++){
-    	   cout << " Neighbor "<< i<<" cell export count " << count_list[i] << "  particle export count   "<<tot_part_list[i]<< endl;
-       }
-
-       cout << "  Neighbor cells coordinate check " << endl;
-
-       for(int i=0; i<nb_cells.size(); i++){
-    	    nb_g_coord = nb_cells[i].get_cell_glob_coord();
-    	    cout <<" cell count " << i <<" " << "glob coordinate "<< nb_g_coord.x <<" "<< nb_g_coord.y<<" "<< nb_g_coord.z << endl;
-
-       }
-
-       cout << " **************************************************** " << endl;
-    }
+//    if (prank == test_rank){
+//       ivec3d nb_g_coord;
+//       cout << " **************************************************** " << endl;
+//       cout << " After allocation check : Neighbor cells  " << endl;
+//       cout << " nb_cells.size() " << nb_cells.size()<< endl;
+//
+//       cout << " neighbor cells counter check " << endl;
+//
+//       for(int i=0;i<7;i++){
+//    	   cout << " Neighbor "<< i<<" cell export count " << count_list[i] << "  particle export count   "<<tot_part_list[i]<< endl;
+//       }
+//
+//       cout << "  Neighbor cells coordinate check " << endl;
+//
+//       for(int i=0; i<nb_cells.size(); i++){
+//    	    nb_g_coord = nb_cells[i].get_cell_glob_coord();
+//    	    cout <<" cell count " << i <<" " << "glob coordinate "<< nb_g_coord.x <<" "<< nb_g_coord.y<<" "<< nb_g_coord.z << endl;
+//
+//       }
+//
+//       cout << " **************************************************** " << endl;
+//    }
 
 	//***************************************************************************
 	//                  My received neighbor part - fill buffers for my neighbors
@@ -1272,13 +1251,16 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
 
 	// allocate memory (to send to neighbors)
-//	nb_0 = new double [buf_count]; nb_1= new double [buf_count]; nb_2 = new double [buf_count];
-//	nb_3 = new double [buf_count]; nb_4= new double [buf_count]; nb_5 = new double [buf_count];
-//	nb_6 = new double [buf_count];
 
 	nb_0 = new double [tot_part_1*10]; nb_1= new double [tot_part_2*10]; nb_2 = new double [tot_part_3*10];
 	nb_3 = new double [tot_part_4*10]; nb_4= new double [tot_part_5*10]; nb_5 = new double [tot_part_6*10];
 	nb_6 = new double [tot_part_7*10];
+
+//	nb_0 = new double []; nb_1= new double []; nb_2 = new double [];
+//	nb_3 = new double []; nb_4= new double []; nb_5 = new double [];
+//	nb_6 = new double [];
+
+
 
 	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
 
@@ -1287,8 +1269,10 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
     double sphere_wall = data_list[2];  // wall thickness
 
     // sweep distance computation (with squares)
-	double r_full   = pow((rsweep + sphere_wall),2.0);
-	double r_sphere = pow(rsweep,2.0);
+	double r_full   = (rsweep + sphere_wall) * (rsweep + sphere_wall);
+	double r_sphere = (rsweep) * (rsweep);
+
+
 
 	vec3d ref_pos, curr_pos;                       // reference/current particle position
 
@@ -1296,117 +1280,154 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	double temp_id; double temp_type;
 	double temp_mass, temp_epot, dist_check;
 	vec3d temp_pos, temp_vel,simbox_size;
+    int real_types;
 
-	simbox_size.x = data_list[3];
-	simbox_size.y = data_list[4];
-	simbox_size.z = data_list[5];
-
+	simbox_size.x = data_list[3];         // simbox x dimension
+	simbox_size.y = data_list[4];         // simbox y dimension
+	simbox_size.z = data_list[5];         // simbox z dimension
+	real_types    = (int) data_list[6];   // no of real types
 
 	long total_particles=0;                       // counter for total particle no in buffers
 	int ind =0;                                   // neighbor cell counter
 	long buf_counter,part_count;
-
-
-
+    double* pos_holder, buffer_holder;
 	int nb_ptr=0;
 
-//	for(int j=0; j<7;j++ ){ // loop over all neighbor CPU
-//	    buf_counter=1;
+//	if(prank == test_rank){
+//	    cout << "================================================" << endl;
+//		cout << " Received attributes check data_list " << endl;
+//	    cout << " rsweep   :" << rsweep << endl;
+//	    cout << " sphere_wall  :" <<sphere_wall << endl;
+//	    cout << " simbox_size.x :" << simbox_size.x << endl;
+//	    cout << " simbox_size.y :" << simbox_size.y << endl;
+//	    cout << " simbox_size.z :" << simbox_size.z << endl;
+//	    cout << " real_types  : "<<real_types << endl;
 //
-//	    // get received neighbor chosen particle position
-//	    ref_pos.x = *rec_pos[j+0]; ref_pos.y = *rec_pos[j+1]; ref_pos.z = *rec_pos[j+2];
-//
-//	    for(int k=nb_ptr; k<(nb_ptr+count_list[j]); k++){ // loop over each neighbor  total export cells
-//
-//	    	    nb_ptr = count_list[j]; // updating neigbor pointer
-//
-//	    	    part_count = nb_cells[k].get_nparticles(); //get total particles
-//
-//	    	    for (long val=0; val<part_count; val++){ // loop over particles in each neighbor cell
-//
-//		    		          curr_pos = nb_cells[k].get_particle(val).get_myposition();
-//
-//		    		          // coordinate shifting as per flag initialization(for cells on edges of CPU)
-//		    		          curr_pos.x = curr_pos.x + (flag[j][0] * simbox_size.x);
-//		    		          curr_pos.y = curr_pos.y + (flag[j][1] * simbox_size.y);
-//		    		          curr_pos.z = curr_pos.z + (flag[j][2] * simbox_size.z);
-//
-//		    		          dist_check = distance_vect(ref_pos,curr_pos);
-//		    		          // ----- cutoff check
-//		    		          if(dist_check <= r_full ){
-//
-//	 		    		            // declare virtual particles on sphere boundary
-//	     	    		            if( dist_check > r_sphere ){
-//	     	    			             temp_type = (double) nb_cells[k].get_particle(val).get_mytype();
-//
-//	     	    			             // ignore placeholders on sphere wall
-//		    			                 if (temp_type != (double) 2 ) { // HC: now hardcoded for placeholders
-//
-//		    			        	           temp_id     = (double) (nb_cells[k].get_particle(val).get_mynumber());
-//
-//		    			        	           // add particle id that are sent for sphere constructions
-//		    			        	           list_ids[j].push_back(temp_id);
-//
-//		    			        	           temp_type   = (double) (temp_type + mc_real_types);
-//	                                           temp_mass   =  nb_cells[k].get_particle(val).get_mymass();
-//
-//	                                           // assign temporary position (coordinates shifted if neighbors on cpu boundary)
-//	                                           temp_pos  =  curr_pos;
-//	                                           temp_vel  =  nb_cells[k].get_particle(val).get_myvelocity();
-//	                                           temp_epot =  nb_cells[k].get_particle(val).get_myepot();
-//
-//	                                           // *************************************************
-//	                                           // CRITICAL PART
-//	                                           // *************************************************
-//
-//	                                           // ADD TO BUFFER nb_buffer
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_id;
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_type;
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_mass;
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.x;
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.y;
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.z;
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.x;
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.y;
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.z;
-//	                                           *(nb_buffer[j]+buf_counter++)  = temp_epot;
-//		    			                 }
-//		    		                }
-//		    		                else{ // include all particles inside mc_rsweep
-//
-//	 			        	            temp_id     = (double) (nb_cells[k].get_particle(val).get_mynumber());
-//	 			        	            temp_type   = (double) (nb_cells[k].get_particle(val).get_mytype());
-//	                                    temp_mass   =  nb_cells[k].get_particle(val).get_mymass();
-//
-//	                                    // assign temporary position (coordinates shifted if neighbors on cpu boundary)
-//	                                    temp_pos  =  curr_pos;
-//	                                    temp_vel  =  nb_cells[k].get_particle(val).get_myvelocity();
-//	                                    temp_epot =  nb_cells[k].get_particle(val).get_myepot();
-//
-//	                                    // ADD TO BUFFER nb_nb_buffer_0
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_id;
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_type;
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_mass;
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.x;
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.y;
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.z;
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.x;
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.y;
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.z;
-//	                                    *(nb_buffer[j]+buf_counter++) = temp_epot;
-//
-//		             	            }
-//
-//		                      }  // cut-off check
-//		    	     } //  end of particles loop
-//		    	     ind++; // neighbor cells counter
-//
-//	    	    } // loop over each neighbor sub total
-//	    	    // no of particles in each neighbor buffer
+//		cout << "================================================" << endl;
+//	}
+
+	for(int j=0; j<7;j++){ // loop over all neighbor CPU
+
+		buf_counter=0;
+		//buffer_holder = nb_buffer[j];
+
+	    // get received neighbor chosen particle position
+	    pos_holder = rec_pos[j];
+	    ref_pos.x = pos_holder[0]; ref_pos.y = pos_holder[1]; ref_pos.z = pos_holder[2];
+
+
+
+	    if(prank == test_rank){
+	    	cout << " my neighbor id : " << j << " & chosen particle position : " <<ref_pos.x<<" "<<ref_pos.y<<" "<<ref_pos.z << endl;
+            cout << " flag[j][0]  :" << flag[j][0] << "flag[j][1]  :" << flag[j][1] << " flag[j][2] : "<< flag[j][2] << endl;
+	    }
+
+	    for(int k=nb_ptr; k<(nb_ptr+count_list[j]); k++){ // loop over each neighbor  total export cells
+
+	    	    part_count = nb_cells[k].get_nparticles(); //get total particles
+
+//	    	    if(prank == test_rank){
+//	    	    	cout << " Neigh ID : "<< j << " Export cell ID :  "<< k << "  particles count :   "<< part_count << endl;
+//	    	    	cout << " Export cell global coordinate : " << nb_cells[k].get_cell_glob_coord().x<<" "<<nb_cells[k].get_cell_glob_coord().y
+//	    	    			<<" "<<nb_cells[k].get_cell_glob_coord().y<< endl;
+//	    	    }
+
+
+	    	    for (long val=0; val<part_count; val++){ // loop over particles in each neighbor cell
+
+		    		          curr_pos = nb_cells[k].get_particle(val).get_myposition();
+
+		    		          // coordinate shifting as per flag initialization(for cells on edges of CPU)
+		    		          curr_pos.x = curr_pos.x + (flag[j][0] * simbox_size.x);
+		    		          curr_pos.y = curr_pos.y + (flag[j][1] * simbox_size.y);
+		    		          curr_pos.z = curr_pos.z + (flag[j][2] * simbox_size.z);
+
+		    		          // compute distance
+		    		          dist_check = distance_vect(ref_pos,curr_pos);
+
+//		    		          if(prank == test_rank){
+//		    		        	  cout <<" r_sphere  :"<<r_sphere<<" "<< "r_full : "<<r_full<<"  "<< " dist_check : " << dist_check<< endl;
+//		    		          }
+		    		          // ----- cutoff check
+		    		          if(dist_check <= r_full ){
+
+	 		    		            // declare virtual particles on sphere boundary
+	     	    		            if( dist_check > r_sphere ){
+	     	    			             temp_type = (double) nb_cells[k].get_particle(val).get_mytype();
+
+	     	    			             // ignore placeholders on sphere wall
+		    			                 if (temp_type != (double) 2 ) { // HC: now hardcoded for placeholders
+
+		    			        	           temp_id     = (double) (nb_cells[k].get_particle(val).get_mynumber());
+
+		    			        	           // add particle id that are sent for sphere constructions
+		    			        	           //list_ids[j].push_back(temp_id);
+
+		    			        	           temp_type   = (double) (temp_type + real_types);
+	                                           temp_mass   =  nb_cells[k].get_particle(val).get_mymass();
+
+	                                           // assign temporary position (coordinates shifted if neighbors on CPU boundary)
+	                                           temp_pos  =  curr_pos;
+	                                           temp_vel  =  nb_cells[k].get_particle(val).get_myvelocity();
+	                                           temp_epot =  nb_cells[k].get_particle(val).get_myepot();
+
+
+	                                           // ADD TO BUFFER nb_buffer
+
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_id;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_type;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_mass;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.x;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.y;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_pos.z;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.x;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.y;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.z;
+	                                           *(nb_buffer[j]+buf_counter++)  = temp_epot;
+		    			                 }
+		    		                }
+		    		                else{ // include all particles inside mc_rsweep
+
+	 			        	            temp_id     = (double) (nb_cells[k].get_particle(val).get_mynumber());
+	 			        	            temp_type   = (double) (nb_cells[k].get_particle(val).get_mytype());
+	                                    temp_mass   =  nb_cells[k].get_particle(val).get_mymass();
+
+	                                    // assign temporary position (coordinates shifted if neighbors on cpu boundary)
+	                                    temp_pos  =  curr_pos;
+	                                    temp_vel  =  nb_cells[k].get_particle(val).get_myvelocity();
+	                                    temp_epot =  nb_cells[k].get_particle(val).get_myepot();
+
+	                                    // ADD TO BUFFER nb_nb_buffer_0
+
+	                                    *(nb_buffer[j]+buf_counter++) = temp_id;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_type;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_mass;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.x;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.y;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_pos.z;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.x;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.y;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.z;
+	                                    *(nb_buffer[j]+buf_counter++) = temp_epot;
+
+		             	            }
+
+		                      }  // cut-off check
+		    	     } //  end of particles loop
+
+			    	 //if(prank == test_rank){
+			    	 cout << " my rank : "<< prank << " "<< " Neigh ID : "<< j << " Added  particles to buffer count :   "<< buf_counter * 0.1 << endl;
+			    	 //}
+
+	    	    } // loop over each neighbor sub total
+	            nb_ptr += count_list[j]; // updating neigbor pointer
+
+
+	    	    // no of particles in each neighbor buffer
 //	    	    total_particles = (buf_counter-1) * 0.1 ;     //10 attributes for each particle
 //	            *(nb_buffer[j])  = (double) total_particles;  // each buffer first location has particles count
-//
-//		} // end of Neighbor cpu loop
+
+		} // end of Neighbor cpu loop
 
 
 
@@ -1488,7 +1509,9 @@ double distance_vect(vec3d v1,vec3d v2){
 	temp_v.z = v2.z - v1.z ;
 
 	// compute distance as sum of square
-	dist = (scalar_prod(temp_v,temp_v));
+	//dist = (scalar_prod(temp_v,temp_v));
+
+	dist = temp_v.x*temp_v.x + temp_v.y*temp_v.y +temp_v.z*temp_v.z ;
 
 	return dist;
 }

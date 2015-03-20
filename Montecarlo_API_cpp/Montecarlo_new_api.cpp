@@ -246,7 +246,7 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int win_id = 0;  // Hardcoded for testing
 
-	int test_cpu = 1;
+	int test_cpu = 7;
 
 	int dbug_flag = 0;   // debug flag -- print check statements
 
@@ -310,6 +310,40 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     dat_list[6] = (double) mc_real_types;
 
 
+    // some test case examples
+
+    if((mc_prank==0)) {
+    	rand_particle.set_myposition(2.8617,2.8651,1.4384);
+    }
+
+    if( (mc_prank==1)  ){
+    	rand_particle.set_myposition(2.8617,2.8651,41.4575);
+    }
+
+    if((mc_prank==2)){
+    	rand_particle.set_myposition(4.2909,41.4549,1.4384);
+    }
+
+    if((mc_prank==3)){
+    	rand_particle.set_myposition(2.8617,42.8842,41.4575);
+    }
+
+    if((mc_prank==4)){
+    	rand_particle.set_myposition(44.3100,2.8651,2.8677);
+    }
+
+    if((mc_prank==5)){
+    	rand_particle.set_myposition(42.8808,2.8651,41.4575);
+    }
+
+    if((mc_prank==6)){
+    	rand_particle.set_myposition(42.8808,42.8842,1.4384);
+    }
+
+    if((mc_prank==7)){
+    	rand_particle.set_myposition(42.8808,42.8842,41.4575);
+    }
+
     // construct sphere
     celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,mc_cpu_cell_dim);
 
@@ -361,23 +395,16 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     // edited // do_local_mdrun(md_binary,md_param);
 
-    // if accept update
-    //update_particle(cell_obj.get_cell_id(),sam_particle);
-
     //*****************************************
     //          some energy computation as per ensemble definitions (to initiate acceptance flag!!)
     //*****************************************
 
-    // acceptance condition(here to be included)
-
-    // reading updated configuration after simulation
-    //read_update_config(accept_flag,sample_id, file_name ,sam_particle,c_obj);
 
     // edited // read_update_config(sample_id, file_name ,sam_particle,c_obj);
 
     // fill mc container
 
-    // edited // fill_mc_container(c_obj);
+    // edited // fill_mc_container(c_obj); // (this method could be defined locally here!!)
 
     // clear created objects
 

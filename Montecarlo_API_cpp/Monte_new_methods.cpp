@@ -718,7 +718,6 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
 	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
 
-	// TOO BE VERIFIED
 
 	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
 
@@ -741,6 +740,7 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	// ==========================================================
 	// Detect neighbor processes (maximum 7 if periodicity is enabled in all direction) as per window position
 	// ==========================================================
+
     // select neighbors as per sample window position
 	int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
 
@@ -1256,12 +1256,6 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	nb_3 = new double [tot_part_4*10]; nb_4= new double [tot_part_5*10]; nb_5 = new double [tot_part_6*10];
 	nb_6 = new double [tot_part_7*10];
 
-//	nb_0 = new double []; nb_1= new double []; nb_2 = new double [];
-//	nb_3 = new double []; nb_4= new double []; nb_5 = new double [];
-//	nb_6 = new double [];
-
-
-
 	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
 
 
@@ -1271,8 +1265,6 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
     // sweep distance computation (with squares)
 	double r_full   = (rsweep + sphere_wall) * (rsweep + sphere_wall);
 	double r_sphere = (rsweep) * (rsweep);
-
-
 
 	vec3d ref_pos, curr_pos;                       // reference/current particle position
 
@@ -1287,7 +1279,7 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	simbox_size.z = data_list[5];         // simbox z dimension
 	real_types    = (int) data_list[6];   // no of real types
 
-	long total_particles=0;                       // counter for total particle no in buffers
+	long total_particles;                       // counter for total particle no in buffers
 	int ind =0;                                   // neighbor cell counter
 	long buf_counter,part_count;
     double* pos_holder, buffer_holder;
@@ -1309,18 +1301,55 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	for(int j=0; j<7;j++){ // loop over all neighbor CPU
 
 		buf_counter=0;
-		//buffer_holder = nb_buffer[j];
 
 	    // get received neighbor chosen particle position
 	    pos_holder = rec_pos[j];
 	    ref_pos.x = pos_holder[0]; ref_pos.y = pos_holder[1]; ref_pos.z = pos_holder[2];
 
+//	    //==============================================================================================
+//	    // some test case examples
+//	    if( (prank==0)  && (j==0) ){
+//	    	 ref_pos.x = 2.8617; ref_pos.y = 2.8651; ref_pos.z = 41.4575;
+//	    }
+//
+//	    if((prank==1)  && (j==0)) {
+//	    	ref_pos.x = 2.8617; ref_pos.y = 2.8651; ref_pos.z = 1.4384;
+//	    }
+//
+//	    if((prank==2)  && (j==0)){
+//	    	ref_pos.x = 4.2909 ; ref_pos.y = 41.4549; ref_pos.z = 1.4384;
+//	    }
+//
+//	    if((prank==3)  && (j==0)){
+//	    	ref_pos.x = 2.8617 ; ref_pos.y = 42.8842; ref_pos.z = 41.4575;
+//	    }
+//
+//	    if((prank==4)  && (j==0)){
+//	    	ref_pos.x = 44.3100; ref_pos.y = 2.8651; ref_pos.z = 2.8677;
+//	    }
+//
+//	    if((prank==5)  && (j==0)){
+//	    	ref_pos.x = 42.8808 ; ref_pos.y = 2.8651 ; ref_pos.z = 41.4575 ;
+//	    }
+//
+//	    if((prank==6)  && (j==0)){
+//	    	ref_pos.x = 42.8808 ; ref_pos.y = 42.8842; ref_pos.z = 1.4384;
+//	    }
+//
+//	    if((prank==7)  && (j==0)){
+//	    	ref_pos.x = 42.8808 ; ref_pos.y = 42.8842; ref_pos.z = 41.4575;
+//	    }
+//
+//	    //==============================================================================================
 
 
 	    if(prank == test_rank){
+	    	cout<<"  "<<endl;
 	    	cout << " my neighbor id : " << j << " & chosen particle position : " <<ref_pos.x<<" "<<ref_pos.y<<" "<<ref_pos.z << endl;
             cout << " flag[j][0]  :" << flag[j][0] << "flag[j][1]  :" << flag[j][1] << " flag[j][2] : "<< flag[j][2] << endl;
 	    }
+
+	    //total_particles=0;
 
 	    for(int k=nb_ptr; k<(nb_ptr+count_list[j]); k++){ // loop over each neighbor  total export cells
 
@@ -1332,6 +1361,7 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 //	    	    			<<" "<<nb_cells[k].get_cell_glob_coord().y<< endl;
 //	    	    }
 
+	    	    total_particles=0;
 
 	    	    for (long val=0; val<part_count; val++){ // loop over particles in each neighbor cell
 
@@ -1384,6 +1414,7 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.y;
 	                                           *(nb_buffer[j]+buf_counter++)  = temp_vel.z;
 	                                           *(nb_buffer[j]+buf_counter++)  = temp_epot;
+	                                           total_particles++;
 		    			                 }
 		    		                }
 		    		                else{ // include all particles inside mc_rsweep
@@ -1410,26 +1441,44 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	                                    *(nb_buffer[j]+buf_counter++) = temp_vel.z;
 	                                    *(nb_buffer[j]+buf_counter++) = temp_epot;
 
+	                                    total_particles++;
 		             	            }
 
 		                      }  // cut-off check
 		    	     } //  end of particles loop
 
-			    	 //if(prank == test_rank){
-			    	 cout << " my rank : "<< prank << " "<< " Neigh ID : "<< j << " Added  particles to buffer count :   "<< buf_counter * 0.1 << endl;
-			    	 //}
+	    	         //total_particles = buf_counter * 0.1;
+
+	    	         if(prank == test_rank){
+	    	         //if(j==0){
+	    	          cout<<"  "<<endl;
+			    	  cout << " my rank : "<< prank << " "<< " Neigh ID : "<< j << " Added  particles to buffer count :   "<< buf_counter * 0.1 << endl;
+
+			    	 }
+
+
 
 	    	    } // loop over each neighbor sub total
 	            nb_ptr += count_list[j]; // updating neigbor pointer
 
 
-	    	    // no of particles in each neighbor buffer
-//	    	    total_particles = (buf_counter-1) * 0.1 ;     //10 attributes for each particle
-//	            *(nb_buffer[j])  = (double) total_particles;  // each buffer first location has particles count
-
-		} // end of Neighbor cpu loop
+	            tot_part_list[j] =  buf_counter * 0.1; //10 attributes for each particle
 
 
+	} // end of Neighbor cpu loop
+
+	if(prank == test_rank){
+
+	cout << " //////////////////////////////////////////////////////////" << endl;
+   	cout << "    Particle counted for export  "  << endl;
+	cout << "==========================================================0" << endl;
+
+	for(int i=0;i<7;i++){
+		     cout<<"  "<<endl;
+			 cout << "my_rank  : "<< prank << "  Neighbor : " << i << " total particles to send   :" << tot_part_list[i] << endl;
+	}
+	cout << " //////////////////////////////////////////////////////////" << endl;
+	}
 
 	double *my_0, *my_1, *my_2, *my_3, *my_4, *my_5, *my_6; // to be received and filled in sphere cells
 

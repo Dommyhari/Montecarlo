@@ -246,7 +246,7 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int win_id = 0;  // Hardcoded for testing
 
-	int test_cpu = 7;
+	int test_cpu = 0;
 
 	int dbug_flag = 0;   // debug flag -- print check statements
 
@@ -263,7 +263,6 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 	//ncells_cpu = calc_ncells_cpu(cpu_box_diag,mc_cell_dim);
 
 	c_obj.set_mycpu(mc_prank);
-
 
 	// construct cells
 
@@ -312,37 +311,37 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     // some test case examples
 
-    if((mc_prank==0)) {
-    	rand_particle.set_myposition(2.8617,2.8651,1.4384);
-    }
-
-    if( (mc_prank==1)  ){
-    	rand_particle.set_myposition(2.8617,2.8651,41.4575);
-    }
-
-    if((mc_prank==2)){
-    	rand_particle.set_myposition(4.2909,41.4549,1.4384);
-    }
-
-    if((mc_prank==3)){
-    	rand_particle.set_myposition(2.8617,42.8842,41.4575);
-    }
-
-    if((mc_prank==4)){
-    	rand_particle.set_myposition(44.3100,2.8651,2.8677);
-    }
-
-    if((mc_prank==5)){
-    	rand_particle.set_myposition(42.8808,2.8651,41.4575);
-    }
-
-    if((mc_prank==6)){
-    	rand_particle.set_myposition(42.8808,42.8842,1.4384);
-    }
-
-    if((mc_prank==7)){
-    	rand_particle.set_myposition(42.8808,42.8842,41.4575);
-    }
+//    if((mc_prank==0)) {
+//    	rand_particle.set_myposition(2.8617,2.8651,1.4384);
+//    }
+//
+//    if( (mc_prank==1)  ){
+//    	rand_particle.set_myposition(2.8617,2.8651,41.4575);
+//    }
+//
+//    if((mc_prank==2)){
+//    	rand_particle.set_myposition(4.2909,41.4549,1.4384);
+//    }
+//
+//    if((mc_prank==3)){
+//    	rand_particle.set_myposition(2.8617,42.8842,41.4575);
+//    }
+//
+//    if((mc_prank==4)){
+//    	rand_particle.set_myposition(44.3100,2.8651,2.8677);
+//    }
+//
+//    if((mc_prank==5)){
+//    	rand_particle.set_myposition(42.8808,2.8651,41.4575);
+//    }
+//
+//    if((mc_prank==6)){
+//    	rand_particle.set_myposition(42.8808,42.8842,1.4384);
+//    }
+//
+//    if((mc_prank==7)){
+//    	rand_particle.set_myposition(42.8808,42.8842,41.4575);
+//    }
 
     // construct sphere
     celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,mc_cpu_cell_dim);

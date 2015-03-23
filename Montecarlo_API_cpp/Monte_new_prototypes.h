@@ -47,6 +47,8 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank);
 celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat
 		,int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim);
 
+void do_local_mdrun(string bin_name,string param_name,int prank);
+
 double scalar_prod(vec3d u, vec3d v);
 
 int iscalar_prod(ivec3d u, ivec3d v);

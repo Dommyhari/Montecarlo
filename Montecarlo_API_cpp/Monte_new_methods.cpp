@@ -710,7 +710,7 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	//                   Random particle is chosen from sample cell list defined by appropriate window position
 	//########################################################################################################################################################
 
-	celltype sphere_old;
+
 
 	// possible neighbor index as per window location
 
@@ -1753,72 +1753,436 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
           MPI_Send(nb_buffer[6],(*to_send_list[6]*10),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),12,comm_name);
     }
 
-	if(prank == 7){
-
-		int j=2; // neighbor order
-		int par_coun = *to_send_list[j];
-		cout<<"=====================================" <<endl;
-		cout<< " Send particles check : " << endl;
-		cout<< " My rank : " << prank << endl;
-		cout<<"=====================================" <<endl;
-
-		for(int i=0;i<par_coun;i++){
-			cout << "  " <<endl;
-			cout << "Particle id   : " <<*(nb_buffer[j]+ (10*i+0)) << endl;
-			cout << "Particle type : " <<*(nb_buffer[j]+ (10*i+1)) << endl;
-			cout << "Particle mass : " <<*(nb_buffer[j]+ (10*i+2)) << endl;
-			cout << "Particle pos_x: " <<*(nb_buffer[j]+ (10*i+3)) << endl;
-			cout << "Particle pos_y: " <<*(nb_buffer[j]+ (10*i+4)) << endl;
-			cout << "Particle pos_z: " <<*(nb_buffer[j]+ (10*i+5)) << endl;
-			cout << "Particle vel_x: " <<*(nb_buffer[j]+ (10*i+6)) << endl;
-			cout << "Particle vel_y: " <<*(nb_buffer[j]+ (10*i+7)) << endl;
-			cout << "Particle vel_z: " <<*(nb_buffer[j]+ (10*i+8)) << endl;
-			cout << "Particle E_pot: " <<*(nb_buffer[j]+ (10*i+9)) << endl;
-            cout << "  " <<endl;
-
-			cout<<"=====================================" <<endl;
-		}
-
-	}
-
-
-	if(prank == test_rank){
-
-		int j=2; // neighbor order
-		int par_coun = *to_recv_list[j];
-		cout<<"=====================================" <<endl;
-		cout<< " Received particles check : " << endl;
-		cout<< " My rank : " << prank << endl;
-		cout<<"=====================================" <<endl;
-
-		for(int i=0;i<par_coun;i++){
-			cout << "  " <<endl;
-			cout << "Particle id   : " <<*(my_buffer[j]+ (10*i+0)) << endl;
-			cout << "Particle type : " <<*(my_buffer[j]+ (10*i+1)) << endl;
-			cout << "Particle mass : " <<*(my_buffer[j]+ (10*i+2)) << endl;
-			cout << "Particle pos_x: " <<*(my_buffer[j]+ (10*i+3)) << endl;
-			cout << "Particle pos_y: " <<*(my_buffer[j]+ (10*i+4)) << endl;
-			cout << "Particle pos_z: " <<*(my_buffer[j]+ (10*i+5)) << endl;
-			cout << "Particle vel_x: " <<*(my_buffer[j]+ (10*i+6)) << endl;
-			cout << "Particle vel_y: " <<*(my_buffer[j]+ (10*i+7)) << endl;
-			cout << "Particle vel_z: " <<*(my_buffer[j]+ (10*i+8)) << endl;
-			cout << "Particle E_pot: " <<*(my_buffer[j]+ (10*i+9)) << endl;
-            cout << "  " <<endl;
-
-			cout<<"=====================================" <<endl;
-		}
-
-	}
+//	if(prank == 7){
+//
+//		int j=2; // neighbor order
+//		int par_coun = *to_send_list[j];
+//		cout<<"=====================================" <<endl;
+//		cout<< " Send particles check : " << endl;
+//		cout<< " My rank : " << prank << endl;
+//		cout<<"=====================================" <<endl;
+//
+//		for(int i=0;i<par_coun;i++){
+//			cout << "  " <<endl;
+//			cout << "Particle id   : " <<*(nb_buffer[j]+ (10*i+0)) << endl;
+//			cout << "Particle type : " <<*(nb_buffer[j]+ (10*i+1)) << endl;
+//			cout << "Particle mass : " <<*(nb_buffer[j]+ (10*i+2)) << endl;
+//			cout << "Particle pos_x: " <<*(nb_buffer[j]+ (10*i+3)) << endl;
+//			cout << "Particle pos_y: " <<*(nb_buffer[j]+ (10*i+4)) << endl;
+//			cout << "Particle pos_z: " <<*(nb_buffer[j]+ (10*i+5)) << endl;
+//			cout << "Particle vel_x: " <<*(nb_buffer[j]+ (10*i+6)) << endl;
+//			cout << "Particle vel_y: " <<*(nb_buffer[j]+ (10*i+7)) << endl;
+//			cout << "Particle vel_z: " <<*(nb_buffer[j]+ (10*i+8)) << endl;
+//			cout << "Particle E_pot: " <<*(nb_buffer[j]+ (10*i+9)) << endl;
+//            cout << "  " <<endl;
+//
+//			cout<<"=====================================" <<endl;
+//		}
+//
+//	}
+//
+//
+//	if(prank == test_rank){
+//
+//		int j=2; // neighbor order
+//		int par_coun = *to_recv_list[j];
+//		cout<<"=====================================" <<endl;
+//		cout<< " Received particles check : " << endl;
+//		cout<< " My rank : " << prank << endl;
+//		cout<<"=====================================" <<endl;
+//
+//		for(int i=0;i<par_coun;i++){
+//			cout << "  " <<endl;
+//			cout << "Particle id   : " <<*(my_buffer[j]+ (10*i+0)) << endl;
+//			cout << "Particle type : " <<*(my_buffer[j]+ (10*i+1)) << endl;
+//			cout << "Particle mass : " <<*(my_buffer[j]+ (10*i+2)) << endl;
+//			cout << "Particle pos_x: " <<*(my_buffer[j]+ (10*i+3)) << endl;
+//			cout << "Particle pos_y: " <<*(my_buffer[j]+ (10*i+4)) << endl;
+//			cout << "Particle pos_z: " <<*(my_buffer[j]+ (10*i+5)) << endl;
+//			cout << "Particle vel_x: " <<*(my_buffer[j]+ (10*i+6)) << endl;
+//			cout << "Particle vel_y: " <<*(my_buffer[j]+ (10*i+7)) << endl;
+//			cout << "Particle vel_z: " <<*(my_buffer[j]+ (10*i+8)) << endl;
+//			cout << "Particle E_pot: " <<*(my_buffer[j]+ (10*i+9)) << endl;
+//            cout << "  " <<endl;
+//
+//			cout<<"=====================================" <<endl;
+//		}
+//
+//	}
 
 	// synchronize communication
 	MPI_Barrier(comm_name);
 
     // **************************************************************************
 
+    //========================================================================================================================
+	//                                                  Phase-3
+    //                                          allocate received buffers if any
+    //                analyze received buffers and fill into sphere cells if necessary
+	//========================================================================================================================
 
+    // **************************************************************************
+    // **************************************************************************
+    celltype sphere_cell, sphere_old;    // contains particles in spherical domain for LOCAL MD simulation
+    particle atom,my_atom;   // particle object
+
+	//int sam_cell_counter = (cpu_cell_dim.x/2 * cpu_cell_dim.y/2 * cpu_cell_dim.z/2 );   // no of sample cells belonging to window
+
+    // New definition
+	int sam_cell_counter = (cpu_cell_dim.x* cpu_cell_dim.y* cpu_cell_dim.z );   // no of sample cells belonging to window
+
+	celltype sample_cells[sam_cell_counter];  // sample cells for given window type
+
+	long ncells_3 = bobj.get_cell_list_size();
+
+    int count=0;
+
+    // prepare SAMPLE cell list as per sample window id for my own CPU
+
+//    for(int i=zone_limit[win_id].xmin;i<=zone_limit[win_id].xmax;i++){
+//    	for(int j=zone_limit[win_id].ymin;j<=zone_limit[win_id].ymax;j++){
+//    		for(int k=zone_limit[win_id].zmin;k<=zone_limit[win_id].zmax;k++){
+//    			test.x = i; test.y = j; test.z = k;
+//    			sample_cells[count] = bobj.cell_with_lcoord(test,ncells_3);
+//    			// add to sample factor (INCLUDE LATER!!)
+//    			//bobj.cell_with_lcoord(test,ncells_3).add_sample();
+//                count++;
+//    		}// k loop
+//    	}// j loop
+//    }// i loop
+
+
+
+    for(int i=0;i<cpu_cell_dim.x;i++){
+    	for(int j=0;j<cpu_cell_dim.y;j++){
+    		for(int k=0;k<cpu_cell_dim.z;k++){
+    			test.x = i; test.y = j; test.z = k;
+    			sample_cells[count] = bobj.cell_with_lcoord(test,ncells_3);
+    			// add to sample factor (INCLUDE LATER!!)
+    			//bobj.cell_with_lcoord(test,ncells_3).add_sample();
+                count++;
+    		}// k loop
+    	}// j loop
+    }// i loop
+
+
+
+
+    // Reference particle position
+    vec3d ref_position = pobj.get_myposition(); // my own selected particle
+    vec3d my_curr; // my current position
+
+    // loop over my sample zone and add to sphere cells with in sweep
+    // get reference particle sweep boundary
+    double ref_xmin = ref_position.x - (rsweep + sphere_wall);
+    double ref_ymin = ref_position.y - (rsweep + sphere_wall);   // minimum boundary
+    double ref_zmin = ref_position.z - (rsweep + sphere_wall);
+
+    //*************************************************************
+    //                  fill sphere cells - My neighbor part
+    //*************************************************************
+
+    // loop over my_received buffers and add particles to sphere cell
+    // shift to origin
+
+    long p_count=0, buf_ind;
+    double temp_position_x,temp_position_y,temp_position_z;
+
+    for(int j=0; j<7; j++){ //loop over neighbors
+
+    	p_count = *to_recv_list[j]; // no of particles in received buffer
+
+    	buf_ind = 0;                      // initialize for each buffer list
+
+    	if(p_count !=0){                  // check for empty buffer
+         	for (long i=0; i< p_count; i++){
+
+         		  atom.set_mynumber((long) *(my_buffer[j]+buf_ind++));
+                  atom.set_mytype((int) *(my_buffer[j]+buf_ind++));
+                  atom.set_mymass((double) *(my_buffer[j]+buf_ind++));
+
+                  // shifting origin of coordinate system
+                  temp_position_x = (double) (*(my_buffer[j]+buf_ind++) - ref_xmin);
+                  temp_position_y = (double) (*(my_buffer[j]+buf_ind++) - ref_ymin);
+                  temp_position_z = (double) (*(my_buffer[j]+buf_ind++) - ref_zmin);
+
+                  atom.set_myposition(temp_position_x,temp_position_y,temp_position_z);
+                  atom.set_myvelocity((double) *(my_buffer[j]+buf_ind++),(double) *(my_buffer[j]+buf_ind++),(double) *(my_buffer[j]+buf_ind++));
+                  atom.set_myepot((double) *(my_buffer[j]+buf_ind++));
+
+                  // appending particle instance to sphere cell list
+                  sphere_cell.add_particle(atom);
+    	    }
+    	}
+    }
+
+    int rec_counter=0;
+    if(prank == test_rank){
+
+    	for(int i=0;i<7;i++){
+    		rec_counter+= *to_recv_list[i];
+    	}
+
+    	cout<< "===============================================" << endl;
+    	cout<< " " << endl;
+        cout<< " Total received particles from my neighbors :  " << rec_counter << endl;
+        cout<< " Total particles from neighbor in sphere cell : "<< sphere_cell.get_nparticles()<<endl;
+        cout<< " Total no of sample cells  : " << sam_cell_counter << endl;
+        cout<< " minimum boundary  :  " << ref_xmin <<"  "<<ref_ymin <<"  "<< ref_zmin<<"  "<< endl;
+        cout<< " " << endl;
+    	cout<< "===============================================" << endl;
+    }
+
+
+
+    //*************************************************************
+    //                   My particle part -fill sphere cells
+    //*************************************************************
+
+    // loop over sample_cells -- perform distance check and add particles to sphere_cell
+    // shift to origin
+    int my_temp_type;
+
+    for(int j=0; j<sam_cell_counter; j++){ // loop over sample cells
+
+    	p_count = sample_cells[j].get_nparticles(); // no of particles in each sample cell
+
+    	for(long i=0; i< p_count; i++){ // loop over particles
+
+    		atom = sample_cells[j].get_particle(i);
+            my_curr = atom.get_myposition();
+
+	        dist_check = distance_vect(ref_position,my_curr);
+
+	        // ----- cutoff check
+	        if(dist_check <= r_full ){
+		            // declare virtual particles on sphere boundary
+		            if( dist_check > r_sphere ){
+
+		            	 my_temp_type = atom.get_mytype();
+
+		                 // ignore placeholders on sphere wall
+	                     if (my_temp_type !=  2 ) { // HC: now hardcoded for placeholders
+
+	                	        my_temp_type = my_temp_type + real_types ;
+
+	                	        // shifting origin of coordinate system
+	                            temp_position_x = atom.get_myposition().x - ref_xmin;
+	                            temp_position_y = atom.get_myposition().y - ref_ymin;
+	                            temp_position_z = atom.get_myposition().z - ref_zmin;
+
+	                            atom.set_myposition(temp_position_x,temp_position_y,temp_position_z); // update shifted position
+	                	        atom.set_mytype(my_temp_type); // update virtual type
+
+                                sphere_cell.add_particle(atom);
+	                     }
+		            }
+		            else{ // include all particles inside mc_rsweep
+
+                	     // shifting origin of coordinate system
+                         temp_position_x = atom.get_myposition().x - ref_xmin;
+                         temp_position_y = atom.get_myposition().y - ref_ymin;
+                         temp_position_z = atom.get_myposition().z - ref_zmin;
+
+                         atom.set_myposition(temp_position_x,temp_position_y,temp_position_z); // update shifted position
+
+		            	 sphere_cell.add_particle(atom);
+		            }
+	        } // end of cut-off check
+
+    	} // loop over particles
+    } // loop over sample cells
+
+    // adding randomly chosen particle of own cpu
+    my_atom = pobj;
+
+
+    // shifting origin of coordinate system
+    temp_position_x = my_atom.get_myposition().x - ref_xmin;
+    temp_position_y = my_atom.get_myposition().y - ref_ymin;
+    temp_position_z = my_atom.get_myposition().z - ref_zmin;
+
+    my_atom.set_myposition(temp_position_x,temp_position_y,temp_position_z);
+
+    // flip its type to real Carbon (SWAPPING PLACEHOLDER INTO CARBON)
+
+    //sphere_cell.get_particle(my_atom.get_mynumber()).set_mytype(1);
+    my_atom.set_mytype(1);
+
+    // adding chosen particle
+    sphere_cell.add_particle(my_atom);
+
+    // creating reference sphere configuration
+    sphere_old = sphere_cell;
+
+    // ***********************************************************************
+    // INCLUDE OTHER TWO TRIAL MOVES HERE
+    // ***********************************************************************
+
+    if(prank == test_rank){
+
+    	cout<< "===============================================" << endl;
+    	cout<< " " << endl;
+        cout<< " Total particles for sphere :  " << rec_counter << endl;
+        cout<< " Total particles (neighbor + my part ) sphere_cell : "<< sphere_cell.get_nparticles()<<endl;
+        cout<< " Total particles (neighbor + my part ) sphere_old: "<< sphere_old.get_nparticles()<<endl;
+        cout<< " " << endl;
+    	cout<< "===============================================" << endl;
+    }
+
+    // *********************************************************************
+    //                          file writing part
+    // *********************************************************************
+
+    //if (prank == test_rank){
+    long file_number;
+    int file_type;
+    double file_mass, file_epot;
+    vec3d file_pos, file_vel;
+
+    // opening file stream object
+    //stringstream convert;
+    //convert << prank;
+    string filename_local = "MC_sphere_config_p_"+to_string(prank)+".chkpt";
+
+    //ofstream fout(filename, ios_base::out);
+    ofstream fout(filename_local, ios_base::out);
+
+    cout<<" Sphere constructor writing to file : " << filename << endl;
+
+    //********** loop over revised sphere cell list - 2 **************
+    long fp_total = sphere_cell.get_nparticles();
+
+
+    // print IMD header -- check
+
+    fout <<"#F A 1 1 1 3 0 0"<<endl;
+    fout<<"#C number type mass x y z vx vy vz epot"<<endl;
+    fout<<"#X 40.009552 0 0 "<<endl;
+    fout<<"#Y 0 40.009552 0 "<<endl;
+    fout<<"#Z 0 0 40.009552 "<<endl;
+    fout<<"#E "<<endl;
+
+
+    for(long fp=0; fp<fp_total; fp++){
+
+        	file_number  = sphere_cell.get_particle(fp).get_mynumber();
+        	file_type    = sphere_cell.get_particle(fp).get_mytype();
+        	file_mass    = sphere_cell.get_particle(fp).get_mymass();
+        	file_pos     = sphere_cell.get_particle(fp).get_myposition();
+        	file_vel     = sphere_cell.get_particle(fp).get_myvelocity(); // optional with #ifdef or so
+        	file_epot    = sphere_cell.get_particle(fp).get_myepot();
+
+            	  // file flush
+
+            fout <<file_number
+            << "  " << file_type
+            << "  " << setprecision(6) << file_mass
+            << "  " << setprecision(6) << file_pos.x
+            << "  " << setprecision(6) << file_pos.y
+            << "  " << setprecision(6) << file_pos.z
+            << "  " << setprecision(6) << file_vel.x
+            << "  " << setprecision(6) << file_vel.y
+            << "  " << setprecision(6) << file_vel.z
+            << "  " << setprecision(6) << file_epot
+            << endl;
+
+
+    }
+
+    fout.close(); // closing outfile connection
+
+    //}
+
+
+
+    // DELETE BUFFER MEMORY ACCORDINGLY
+    delete[] nb_0; delete[] nb_1;delete[] nb_2; delete[] nb_3;
+    delete[] nb_4;delete[] nb_5;delete[] nb_6;
+
+    delete[] my_0; delete[] my_1;delete[] my_2; delete[] my_3;
+    delete[] my_4;delete[] my_5;delete[] my_6;
 
 	return sphere_old;
 }
+
+// pass IMD_executable and param file as arguments
+void do_local_mdrun(string bin_name,string param_name,int prank){
+
+	       // method to run local MD simulation
+	       // later extend format for Lammps,etc..
+
+	// make binary and parameter file clone
+
+	string srank    =  to_string(prank);
+	string spath    =  "./" ;
+	string space    =  "  " ;
+    string verflag  =  " -p ";
+    string nline    =  " \n ";
+    string uscore   =  "_";
+    string f_extent =  ".param";
+    string copy_cmd =  "cp"; // bash command
+    string remov_cmd=  "rm"; // bash command
+
+    string ensem       = "glok";
+    string coord_name  = "MC_sphere_config_p_"+srank+".chkpt";
+    string out_file    = "./sphere_out/MC_sphere_config_p_"+srank+"_relax";
+
+    string filename_local = "local_md_part1_"+to_string(prank)+".param";
+
+    // writing part1 param file
+    ofstream fout(filename_local, ios_base::out);
+
+    fout << "ensemble" <<"           "<< ensem << endl;
+    fout << " " << endl;
+    fout << "coordname"<<"           "<< coord_name << endl;
+    fout << " " << endl;
+    fout << "outfiles"<<"           "<< out_file << endl;
+    fout << " " << endl;
+    fout.close(); // closing outfile connection
+
+
+    string param_1    =   filename_local;
+    string param_2    =   "local_md_part2.param";
+    string param_out  =   "local_md_"+srank+".param";
+
+    string merge_cmd = "cat" + space + param_1 + space + param_2 + space+
+    		            ">>" + space + param_out;
+    system( merge_cmd.c_str());
+
+	string new_bin   = bin_name + uscore + srank ;
+
+	string new_param = param_out;
+
+    // copy commands
+    string cmd1 = copy_cmd + space + bin_name +space + new_bin;
+
+    //string cmd2 = copy_cmd + space + param_name+f_extent +space + new_param;
+
+    // remove commands
+    string cmd3 = remov_cmd + space + new_bin;
+    string cmd4 = remov_cmd + space + new_param;
+
+    // IMD command
+    string exec_string = spath + new_bin + space + verflag + space + new_param + nline;
+
+    // getting char* from string
+    const char * cmd1_ptr = cmd1.c_str();
+    const char * cmd3_ptr = cmd3.c_str();
+    const char * cmd4_ptr = cmd4.c_str();
+    const char * expr = exec_string.c_str();
+
+    // file copying
+    system(cmd1_ptr); // copy binary clone
+
+	system(expr);     // run MD simulation
+
+	//file removing
+    system(cmd3_ptr); // remove binary clone
+    system(cmd4_ptr); // remove param clone
+}
+
+
 
 int get_cpu_rank(int inde0,int inde1,int inde2, MPI_Comm c_name){
 	// gives my cpu rank with my own coordinates

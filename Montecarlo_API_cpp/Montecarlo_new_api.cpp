@@ -244,7 +244,7 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int accept_flag = 0; // acceptance flag
 
-	int win_id = 0;  // Hardcoded for testing
+	int win_id = 5;  // Hardcoded for testing
 
 	int test_cpu = 0;
 
@@ -312,7 +312,8 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     // some test case examples
 
 //    if((mc_prank==0)) {
-//    	rand_particle.set_myposition(2.8617,2.8651,1.4384);
+//    	rand_particle.set_myposition(2.8617,2.8651,1.4384); // 80x80x80 -win 0
+//    	//rand_particle.set_myposition(11.4372, 2.8651, 2.8677); // 300x300x300 -win 0
 //    }
 //
 //    if( (mc_prank==1)  ){
@@ -333,6 +334,7 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 //
 //    if((mc_prank==5)){
 //    	rand_particle.set_myposition(42.8808,2.8651,41.4575);
+//    	//rand_particle.set_myposition(60.0318,21.4454,61.4671); // critical check
 //    }
 //
 //    if((mc_prank==6)){
@@ -392,7 +394,11 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     //run local MD
 
-    // edited // do_local_mdrun(md_binary,md_param);
+    //if(mc_prank==0){
+
+    do_local_mdrun(md_binary,md_param,mc_prank);
+
+    //}
 
     //*****************************************
     //          some energy computation as per ensemble definitions (to initiate acceptance flag!!)

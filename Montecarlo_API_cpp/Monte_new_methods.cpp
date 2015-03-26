@@ -2413,117 +2413,131 @@ void read_update_config (int win_id,particle pobj,cellblock bobj,celltype old_sp
 
 	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
 
+    if(prank == test_rank){
+        cout << " =================================================" << endl;
+    	cout << " Updated neighbor particles Before check " << endl;
+        cout << "  My rank : " << prank << endl;
+        cout << " =================================================" << endl;
+
+    	for(int i=0; i<7; i++){
+              //cout << " to_send_list[ "<<i<<"] : "<< *to_send_list[i]<< endl;
+    		cout << " to rank : "<< rec_nb_rank[i] << "  and count :" << *to_send_list[i]*0.1<< endl;
+    	}
+    	cout << " =================================================" << endl;
+    }
+
+
     // Update if configuration get accepted
 
-//    if(accep_tag){
-//
-//            particle atom;
-//
-//            long buf_ind, total_particles=0;
-//            cout<< "Updating particle attributes " << endl;
-//
-//            // temporary holder for particle attributes
-//    		double temp_id; double temp_type;
-//    		double temp_mass, temp_epot, dist_check;
-//    		double temp_vel_x,temp_vel_y,temp_vel_z;
-//            double temp_pos_x,temp_pos_y,temp_pos_z;
-//
-//            double inst_pos[3];
-//
-//            ivec3d cpu_fact,cell_glob_coord,cell_loc_coord, nb_cpu_gcoord;
-//            int loc_rank , target, cell_index, type_check;
-//
-//            long particle_id;
-//
-//            // get total no of cells in my CPU block
-//            long total_cells = bobj.get_cell_list_size();
-//
-//            for (int i=0; i< (fbuffer_id.size()-1); i++){ // loop over read data
-//
-//            	type_check = fbuffer_type.at(i);
-//
-//            	if(type_check < real_types){ // ignore spherical wall particles (CHECK: reconsider this!!)
-//
-//            	    buf_ind = 0;                      // initialize for each buffer step
-//            	    // attributes assignments
-//            	    temp_id     = (double) fbuffer_id.at(i);
-//                    temp_type   = (double) fbuffer_type.at(i);       // type conversion for buffer type consistency
-//            	    temp_mass   = fbuffer_mass.at(i);
-//
-//            	    // position assignments
-//            	    temp_pos_x  = fbuffer_pos_x.at(i);
-//            	    temp_pos_y  = fbuffer_pos_y.at(i);
-//            	    temp_pos_z  = fbuffer_pos_z.at(i);
-//
-//             	    // global boundary check and position update to actual box dimensions
-//             	    if (fbuffer_pos_x.at(i) < 0.0)               temp_pos_x += simbox_size.x ;
-//             	    if (fbuffer_pos_x.at(i) > simbox_size.x)     temp_pos_x -= simbox_size.x ;
-//             	    if (fbuffer_pos_y.at(i) < 0.0)               temp_pos_y += simbox_size.y ;
-//             	    if (fbuffer_pos_y.at(i) > simbox_size.y)     temp_pos_y -= simbox_size.y ;
-//             	    if (fbuffer_pos_z.at(i) < 0.0)               temp_pos_z += simbox_size.z ;
-//             	    if (fbuffer_pos_z.at(i) > simbox_size.z)     temp_pos_z -= simbox_size.z ;
-//
-//
-//                    // velocity
-//            	    temp_vel_x  = fbuffer_vel_x.at(i);
-//            	    temp_vel_y  = fbuffer_vel_y.at(i);
-//            	    temp_vel_z  = fbuffer_vel_z.at(i);
-//
-//                    // potential energy
-//            	    temp_epot   = fbuffer_epot.at(i);
-//
-//            	    inst_pos[0] = temp_pos_x; inst_pos[1] = temp_pos_y; inst_pos[2] = temp_pos_z;
-//
-//             	    // global cell coordinate from particle position
-//            		cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim); // New try with my method
-//
-//         		    // CPU global coordinate from cell global coordinate
-//         		    nb_cpu_gcoord.x = cell_glob_coord.x / cpu_cell_dim.x;
-//         		    nb_cpu_gcoord.y = cell_glob_coord.y / cpu_cell_dim.y;
-//         		    nb_cpu_gcoord.z = cell_glob_coord.z / cpu_cell_dim.z;
-//
-//         		    // CPU rank
-//         		    loc_rank = get_cpu_rank(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z,comm_name);
-//
-//         		    // particle belongs to neighbor
-//         		    if (loc_rank != mc_prank){
-//         		        //******************************************
-//         		        // if loc_rank != my rank fill it in target buffer
-//         		        //****************************
-//
-//         			    // identify buffer target as per rank
-//         			    for(int ind=0; ind<7;ind++){
-//         				    if(rec_nb_rank[ind] == loc_rank) target=ind;
-//         			    }
-//
-//         			    // buffer size counter (start filling from last index +1)
-//         			    //buf_ind += buff_size[target];
-//
-//         			   buf_ind = *to_send_list[target];
-//
-//         			    //*(nb_buffer[j]+buf_counter++)  = temp_id;
-//
-//         			    // ADD TO BUFFER nb_buffer
-//                        *(nb_buffer[target]+buf_ind++)  = temp_id;
-//                        *(nb_buffer[target]+buf_ind++)  = temp_type;
-//                        *(nb_buffer[target]+buf_ind++)  = temp_mass;
-//                        *(nb_buffer[target]+buf_ind++)  = temp_pos_x;
-//                        *(nb_buffer[target]+buf_ind++)  = temp_pos_y;
-//                        *(nb_buffer[target]+buf_ind++)  = temp_pos_z;
-//                        *(nb_buffer[target]+buf_ind++)  = temp_vel_x;
-//                        *(nb_buffer[target]+buf_ind++)  = temp_vel_y;
-//                        *(nb_buffer[target]+buf_ind++)  = temp_vel_z;
-//                        *(nb_buffer[target]+buf_ind++)  = temp_epot;
-//
-//                        // updating buffer size for every particle belongs to it
-//                        *to_send_list[target] = buf_ind;
-//
-////                        buff_size[target] = buf_ind-1; // check it!!
-//
-//         		    }
-//
-//         		    else{ // particles from my CPU
-//
+    if(accep_tag){
+
+            particle atom;
+
+            long buf_ind, total_particles=0;
+
+            // temporary holder for particle attributes
+    		double temp_id; double temp_type;
+    		double temp_mass, temp_epot, dist_check;
+    		double temp_vel_x,temp_vel_y,temp_vel_z;
+            double temp_pos_x,temp_pos_y,temp_pos_z;
+
+            double inst_pos[3];
+
+            ivec3d cpu_fact,cell_glob_coord,cell_loc_coord, nb_cpu_gcoord;
+            int loc_rank, target, cell_index, type_check;
+
+            long particle_id;
+
+            // get total no of cells in my CPU block
+            long total_cells = bobj.get_cell_list_size();
+
+            for (int i=0; i< (fbuffer_id.size()-1); i++){ // loop over read data
+
+            	type_check = fbuffer_type.at(i);
+
+            	if(type_check < real_types){ // ignore spherical wall particles (CHECK: reconsider this!!)
+
+            	    buf_ind = 0;                      // initialize for each buffer step
+
+
+            	    // attributes assignments
+            	    temp_id     = (double) fbuffer_id.at(i);
+                    temp_type   = (double) fbuffer_type.at(i);       // type conversion for buffer type consistency
+            	    temp_mass   = fbuffer_mass.at(i);
+
+            	    // position assignments
+            	    temp_pos_x  = fbuffer_pos_x.at(i);
+            	    temp_pos_y  = fbuffer_pos_y.at(i);
+            	    temp_pos_z  = fbuffer_pos_z.at(i);
+
+             	    // global boundary check and position update to actual box dimensions
+             	    if (fbuffer_pos_x.at(i) < 0.0)               temp_pos_x += simbox_size.x ;
+             	    if (fbuffer_pos_x.at(i) > simbox_size.x)     temp_pos_x -= simbox_size.x ;
+             	    if (fbuffer_pos_y.at(i) < 0.0)               temp_pos_y += simbox_size.y ;
+             	    if (fbuffer_pos_y.at(i) > simbox_size.y)     temp_pos_y -= simbox_size.y ;
+             	    if (fbuffer_pos_z.at(i) < 0.0)               temp_pos_z += simbox_size.z ;
+             	    if (fbuffer_pos_z.at(i) > simbox_size.z)     temp_pos_z -= simbox_size.z ;
+
+
+                    // velocity
+            	    temp_vel_x  = fbuffer_vel_x.at(i);
+            	    temp_vel_y  = fbuffer_vel_y.at(i);
+            	    temp_vel_z  = fbuffer_vel_z.at(i);
+
+                    // potential energy
+            	    temp_epot   = fbuffer_epot.at(i);
+
+            	    inst_pos[0] = temp_pos_x; inst_pos[1] = temp_pos_y; inst_pos[2] = temp_pos_z;
+
+             	    // global cell coordinate from particle position
+            		cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim); // New try with my method
+
+         		    // CPU global coordinate from cell global coordinate
+         		    nb_cpu_gcoord.x = cell_glob_coord.x / cpu_cell_dim.x;
+         		    nb_cpu_gcoord.y = cell_glob_coord.y / cpu_cell_dim.y;
+         		    nb_cpu_gcoord.z = cell_glob_coord.z / cpu_cell_dim.z;
+
+         		    // CPU rank
+         		    loc_rank = get_cpu_rank(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z,comm_name);
+
+         		    // particle belongs to neighbor
+         		    if (loc_rank != prank){
+         		        //******************************************
+         		        // if loc_rank != my rank fill it in target buffer
+         		        //****************************
+
+         			    // identify buffer target as per rank
+         			    for(int ind=0; ind<7;ind++){
+         				    if(rec_nb_rank[ind] == loc_rank) target=ind;
+         			    }
+
+         			    // buffer size counter (start filling from last index +1)
+         			    //buf_ind += buff_size[target];
+
+         			   buf_ind = *to_send_list[target];
+
+         			    //*(nb_buffer[j]+buf_counter++)  = temp_id;
+
+         			    // ADD TO BUFFER nb_buffer
+                        *(nb_buffer[target]+buf_ind++)  = temp_id;
+                        *(nb_buffer[target]+buf_ind++)  = temp_type;
+                        *(nb_buffer[target]+buf_ind++)  = temp_mass;
+                        *(nb_buffer[target]+buf_ind++)  = temp_pos_x;
+                        *(nb_buffer[target]+buf_ind++)  = temp_pos_y;
+                        *(nb_buffer[target]+buf_ind++)  = temp_pos_z;
+                        *(nb_buffer[target]+buf_ind++)  = temp_vel_x;
+                        *(nb_buffer[target]+buf_ind++)  = temp_vel_y;
+                        *(nb_buffer[target]+buf_ind++)  = temp_vel_z;
+                        *(nb_buffer[target]+buf_ind++)  = temp_epot;
+
+                        // updating buffer size for every particle belongs to it
+                        *to_send_list[target] = buf_ind;
+
+
+         		    }
+
+         		    else{ // particles from my CPU
+
 //         		        // CPU global position
 //         		        cpu_fact = get_cpu_gcoord(loc_rank,comm_name);
 //
@@ -2549,31 +2563,42 @@ void read_update_config (int win_id,particle pobj,cellblock bobj,celltype old_sp
 //
 //         		        // have to revise such that add the particle directly instead of update
 //         		        update_particle(bobj,cell_index,atom);
-//
-//         		    }
-//
-//                }// spherical wall check
-//            } // for loop read data
-//
-//            // assign buffer size to each neighbor CPU
-//
+
+         		    }
+
+                }// spherical wall check
+
+            } // for loop read data
+
+            // assign buffer size to each neighbor CPU
+
 //            for (int r_count=0; r_count<7; r_count++){
 //    	      total_particles       = buff_size[r_count] * 0.1 ;  // 10 attributes for each particle
 //              *(nb_buffer[r_count])  = (double) total_particles;  // each buffer first location has particles count
-//
-//
 //            }
-//
-//	} // acceptance condition
-//
+
+	} // acceptance condition
+
 //	else{ // rejected condition
-//
+
 //		for(int j=0; j<7; j++){
 //			*(nb_buffer[j]) = 0.0; // assign all neighbor buffer size to 0
 //		}
 //	}
 
-
+    if(prank == test_rank){
+    	cout << " =================================================" << endl;
+        cout << " Updated neighbor particles After check " << endl;
+        cout << "  My rank : " << prank << endl;
+        cout << " =================================================" << endl;
+        int tot=0;
+    	for(int i=0; i<7; i++){
+              cout << " to rank : "<< rec_nb_rank[i] << " and count :" << *to_send_list[i]*0.1<< endl;
+              tot+= *to_send_list[i]*0.1;
+    	}
+    	cout <<"     Total sum : " << tot << endl;
+    	cout << " =================================================" << endl;
+    }
 }
 
 int acceptance_check(int type,celltype old_sphere,celltype new_sphere){

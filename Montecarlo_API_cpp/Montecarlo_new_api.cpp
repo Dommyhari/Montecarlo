@@ -246,7 +246,7 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int win_id = 0;  // Hardcoded for testing
 
-	int test_cpu = 0;
+	int test_cpu = 5;
 
 	int dbug_flag = 0;   // debug flag -- print check statements
 

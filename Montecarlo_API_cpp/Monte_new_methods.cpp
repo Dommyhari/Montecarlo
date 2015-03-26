@@ -2330,91 +2330,88 @@ void read_update_config (int win_id,particle pobj,cellblock bobj,celltype old_sp
          cout <<"=====================================" << endl;
     }
 
-//    //----------------------------------------------------------------//
-//    //           2- Updating and shifting part                        //
-//    //----------------------------------------------------------------//
-//
-//
-//	// possible neighbor index as per window location
-//
-//	int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
-//	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
-//	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
-//
-//
-//	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
-//
-//	// Old assignment
-//	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
-//	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
-//
-//	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
-//
-//
-//	// ==========================================================
-//	// Detect neighbor processes (maximum 7 if periodicity is enabled in all direction) as per window position
-//	// ==========================================================
-//
-//    // select neighbors as per sample window position
-//	int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
-//
-//	// send neighbors (to whom I send)        ---- process communications (in z direction)
-//	int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
-//
-//	// Receive neighbors (from whom I receive) ----- process communications (in z direction)
-//	int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
-//
-//    // send neighbors (to whom I send) -----  process communications (in x/y direction)
-//	int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
-//
-//	// Receive neighbors (from whom I receive) -----  process communications (in x/y direction)
-//	int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
-//
-//    // prepare neighbor rank lists from whom I received sphere portions (if any)
-//	int rec_nb_rank[7];
-//
-//	// get my process global coordinate
-//	ivec3d gcoord = get_cpu_gcoord(prank,comm_name);
-//	int x = gcoord.x; int y = gcoord.y; int z = gcoord.z; // [ x y z] -- this process coordinate from MPI Cartesian system
-//
-//
-//	for(int ind=0;ind<4;ind++){
-//		rec_nb_rank[ind] = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
-//	}
-//
-//	for(int ind=0;ind<3;ind++){
-//		rec_nb_rank[4+ind] = get_cpu_rank(x+x_recv_next[ind],y+y_recv_next[ind],z+z_recv_next[ind],comm_name);
-//	}
-//
-//	if(prank == test_rank){
-//		cout << "+++++++++++++++++++++++++++++++++" << endl;
-//        cout << " from read update config " << endl;
-//		cout << " My rank : " << prank << endl;
-//		for(int i=0;i<7;i++){
-//          cout << " rec_nb_rank["<<i<<"]"<<rec_nb_rank[i] << endl;
-//		}
-//
-//		cout << "+++++++++++++++++++++++++++++++++" << endl;
-//	}
+    //----------------------------------------------------------------//
+    //         Phase  2- Updating and shifting part                        //
+    //----------------------------------------------------------------//
 
-//	// N1 N2 N4 N6 N3 N5 N7
-//	double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
-//
-//	// particle counters for neighbor communications
-//    long tot_part_1 =0, tot_part_2 =0, tot_part_3 =0, tot_part_4 =0, tot_part_5 =0, tot_part_6 =0, tot_part_7 =0;
-//
-//    // list of neighbor export particles counter
-//    long* to_send_list[7] = {&tot_part_1,&tot_part_2,&tot_part_3,&tot_part_4,&tot_part_5,&tot_part_6,&tot_part_7};
-//
-//	// allocate memory (to send to neighbors)
-//
-//    long buff_size =sphere_new.get_nparticles();
-//
-//	nb_0 = new double [buff_size*10]; nb_1= new double [buff_size*10]; nb_2 = new double [buff_size*10];
-//	nb_3 = new double [buff_size*10]; nb_4= new double [buff_size*10]; nb_5 = new double [buff_size*10];
-//	nb_6 = new double [buff_size*10];
-//
-//	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
+	// possible neighbor index as per window location
+	int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
+	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
+	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
+
+	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
+
+	// Old assignment
+	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
+	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
+
+	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
+
+
+	// ==========================================================
+	// Detect neighbor processes (maximum 7 if periodicity is enabled in all direction) as per window position
+	// ==========================================================
+
+    // select neighbors as per sample window position
+	int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
+
+	// send neighbors (to whom I send)        ---- process communications (in z direction)
+	int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
+
+	// Receive neighbors (from whom I receive) ----- process communications (in z direction)
+	int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
+
+    // send neighbors (to whom I send) -----  process communications (in x/y direction)
+	int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
+
+	// Receive neighbors (from whom I receive) -----  process communications (in x/y direction)
+	int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
+
+    // prepare neighbor rank lists from whom I received sphere portions (if any)
+	int rec_nb_rank[7];
+
+	// get my process global coordinate
+	ivec3d gcoord = get_cpu_gcoord(prank,comm_name);
+	int x = gcoord.x; int y = gcoord.y; int z = gcoord.z; // [ x y z] -- this process coordinate from MPI Cartesian system
+
+
+	for(int ind=0;ind<4;ind++){
+		rec_nb_rank[ind] = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+	}
+
+	for(int ind=0;ind<3;ind++){
+		rec_nb_rank[4+ind] = get_cpu_rank(x+x_recv_next[ind],y+y_recv_next[ind],z+z_recv_next[ind],comm_name);
+	}
+
+	if(prank == test_rank){
+		cout << "+++++++++++++++++++++++++++++++++" << endl;
+        cout << " from read update config " << endl;
+		cout << " My rank : " << prank << endl;
+		for(int i=0;i<7;i++){
+          cout << " rec_nb_rank["<<i<<"]"<<rec_nb_rank[i] << endl;
+		}
+
+		cout << "+++++++++++++++++++++++++++++++++" << endl;
+	}
+
+	// N1 N2 N4 N6 N3 N5 N7
+	double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
+
+	// particle counters for neighbor communications
+    long tot_part_1 =0, tot_part_2 =0, tot_part_3 =0, tot_part_4 =0, tot_part_5 =0, tot_part_6 =0, tot_part_7 =0;
+
+    // list of neighbor export particles counter
+    long* to_send_list[7] = {&tot_part_1,&tot_part_2,&tot_part_3,&tot_part_4,&tot_part_5,&tot_part_6,&tot_part_7};
+
+	// allocate memory (to send to neighbors)
+
+    long buff_size =sphere_new.get_nparticles();
+
+	nb_0 = new double [buff_size*10]; nb_1= new double [buff_size*10]; nb_2 = new double [buff_size*10];
+	nb_3 = new double [buff_size*10]; nb_4= new double [buff_size*10]; nb_5 = new double [buff_size*10];
+	nb_6 = new double [buff_size*10];
+
+	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
 
     // Update if configuration get accepted
 

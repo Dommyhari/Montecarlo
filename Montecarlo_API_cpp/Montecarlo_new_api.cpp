@@ -244,7 +244,7 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int accept_flag = 0; // acceptance flag
 
-	int win_id = 5;  // Hardcoded for testing
+	int win_id = 0;  // Hardcoded for testing
 
 	int test_cpu = 0;
 
@@ -311,39 +311,39 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     // some test case examples
 
-//    if((mc_prank==0)) {
-//    	rand_particle.set_myposition(2.8617,2.8651,1.4384); // 80x80x80 -win 0
+    if((mc_prank==0)) {
+    	rand_particle.set_myposition(2.8617,2.8651,1.4384); // 80x80x80 -win 0
 //    	//rand_particle.set_myposition(11.4372, 2.8651, 2.8677); // 300x300x300 -win 0
-//    }
+    }
 //
-//    if( (mc_prank==1)  ){
-//    	rand_particle.set_myposition(2.8617,2.8651,41.4575);
-//    }
+    if( (mc_prank==1)  ){
+    	rand_particle.set_myposition(2.8617,2.8651,41.4575);
+    }
 //
-//    if((mc_prank==2)){
-//    	rand_particle.set_myposition(4.2909,41.4549,1.4384);
-//    }
+    if((mc_prank==2)){
+    	rand_particle.set_myposition(4.2909,41.4549,1.4384);
+    }
 //
-//    if((mc_prank==3)){
-//    	rand_particle.set_myposition(2.8617,42.8842,41.4575);
-//    }
+    if((mc_prank==3)){
+    	rand_particle.set_myposition(2.8617,42.8842,41.4575);
+    }
 //
-//    if((mc_prank==4)){
-//    	rand_particle.set_myposition(44.3100,2.8651,2.8677);
-//    }
+    if((mc_prank==4)){
+    	rand_particle.set_myposition(44.3100,2.8651,2.8677);
+    }
 //
-//    if((mc_prank==5)){
-//    	rand_particle.set_myposition(42.8808,2.8651,41.4575);
-//    	//rand_particle.set_myposition(60.0318,21.4454,61.4671); // critical check
-//    }
+    if((mc_prank==5)){
+    	rand_particle.set_myposition(42.8808,2.8651,41.4575);
+//    	rand_particle.set_myposition(60.0318,21.4454,61.4671); // critical check
+    }
 //
-//    if((mc_prank==6)){
-//    	rand_particle.set_myposition(42.8808,42.8842,1.4384);
-//    }
+    if((mc_prank==6)){
+    	rand_particle.set_myposition(42.8808,42.8842,1.4384);
+    }
 //
-//    if((mc_prank==7)){
-//    	rand_particle.set_myposition(42.8808,42.8842,41.4575);
-//    }
+    if((mc_prank==7)){
+    	rand_particle.set_myposition(42.8808,42.8842,41.4575);
+    }
 
     // construct sphere
     celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,mc_cpu_cell_dim);
@@ -400,10 +400,8 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     //}
 
-    //*****************************************
-    //          some energy computation as per ensemble definitions (to initiate acceptance flag!!)
-    //*****************************************
-
+    // read or update config
+    read_update_config(win_id,rand_particle,r_partic,cell_sample,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name);
 
     // edited // read_update_config(sample_id, file_name ,sam_particle,c_obj);
 

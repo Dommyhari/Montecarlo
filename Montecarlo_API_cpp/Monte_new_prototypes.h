@@ -49,6 +49,11 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 void do_local_mdrun(string bin_name,string param_name,int prank);
 
+int acceptance_check(int type,celltype old_sphere,celltype new_sphere);
+
+void read_update_config (int win_id,particle pobj,cellblock bobj,celltype old_sphere_conf
+		,double* data_list,int prank,int test_rank,vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name);
+
 double scalar_prod(vec3d u, vec3d v);
 
 int iscalar_prod(ivec3d u, ivec3d v);

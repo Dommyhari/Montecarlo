@@ -156,9 +156,9 @@ ivec3d get_particle_glob_coordinate(double* pos,vec3d mc_cell_phy_dim){
 
 	x_rem = fmod (x,mc_cell_phy_dim.x) ; y_rem = fmod(y,mc_cell_phy_dim.y) ; z_rem = fmod(z,mc_cell_phy_dim.z) ;
 
-	if(x_rem > 0.0) { x_quo++; }
-	if(y_rem > 0.0) { y_quo++; }
-	if(z_rem > 0.0) { z_quo++; }
+//	if(x_rem > 0.0) { x_quo++; }
+//	if(y_rem > 0.0) { y_quo++; }
+//	if(z_rem > 0.0) { z_quo++; }
 
 
 	coord.x = x_quo; coord.y = y_quo; coord.z = z_quo;
@@ -334,7 +334,7 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, ivec3d global_cell_
  		 cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim); // New try with my method
 
  		 // decrement operations
- 		 cell_glob_coord.x = cell_glob_coord.x-1; cell_glob_coord.y = cell_glob_coord.y-1; cell_glob_coord.z = cell_glob_coord.z-1;
+// 		 cell_glob_coord.x = cell_glob_coord.x-1; cell_glob_coord.y = cell_glob_coord.y-1; cell_glob_coord.z = cell_glob_coord.z-1;
 
  		 //cell_glob_coord = cell_coordinate(inst_pos,tbox_dim,global_cell_dim); // Earlier implementation
 
@@ -2182,6 +2182,456 @@ void do_local_mdrun(string bin_name,string param_name,int prank){
     system(cmd4_ptr); // remove param clone
 }
 
+void read_update_config (int win_id,particle pobj,cellblock bobj,celltype old_sphere_conf
+		,double* data_list,int prank,int test_rank,vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name){
+
+
+	vec3d simbox_size;
+    double rsweep      = data_list[1];  // sphere radius
+    double sphere_wall = data_list[2];  // wall thickness
+	simbox_size.x = data_list[3];         // simbox x dimension
+	simbox_size.y = data_list[4];         // simbox y dimension
+	simbox_size.z = data_list[5];         // simbox z dimension
+
+
+	// method for reading current file configuration and updating particle attributes
+	// with in and across CPU process
+
+	//----------------------------------------------//
+	//         Phase 1 - File reading part             //
+    //----------------------------------------------//
+
+    celltype sphere_new;            // contains particles in spherical domain after LOCAL MD simulation
+    particle updated_atom;          // particle object
+
+	int accep_tag=0;
+	const int LIMIT=10000;
+
+
+	// file buffers to store atom data's read from relaxed sphere configuration
+    vector<long>     fbuffer_id;
+    vector<int>      fbuffer_type;
+    vector<double>   fbuffer_mass,fbuffer_epot,fbuffer_eam_rho;
+    vector<double>   fbuffer_pos_x,fbuffer_pos_y,fbuffer_pos_z,fbuffer_vel_x,fbuffer_vel_y,fbuffer_vel_z;
+
+	// input file stream instance
+
+    //string str_fname    = "MC_sphere_config_p_"+to_string(prank)+ ".chkpt";
+
+    string str_fname    = "./sphere_out/MC_sphere_config_p_" + to_string(prank) + "_relax.00000.chkpt";
+
+    cout<< " sphere file check : " << str_fname << endl;
+
+    ifstream fin(str_fname,std::ios_base::in);
+
+    // local value holders from file
+    long f_id; int f_type;
+    double f_mass,f_posx,f_posy,f_posz,f_velx,f_vely,f_velz,f_epot,f_erho;
+
+    int real_types    = (int) data_list[6];   // no of real types
+
+	// initialize reference particle
+	vec3d vec1 = pobj.get_myposition();
+
+	// get reference particle sweep boundary
+	double ref_xmin = vec1.x - (rsweep + sphere_wall);
+	double ref_ymin = vec1.y - (rsweep + sphere_wall);   // minimum boundary
+	double ref_zmin = vec1.z - (rsweep + sphere_wall);
+
+    char headerline[LIMIT];
+
+    cout<< " Reading simulation sphere file " << str_fname << endl;
+
+    // crunch header part
+    while (fin.get() == '#'){
+          fin.getline(headerline,LIMIT,'\n');
+          continue;
+    }
+
+    // read and fill buffer
+    while( !fin.eof()){ // end of file check
+
+    	   // reading         // pushing
+           fin>>f_id;        fbuffer_id.push_back(f_id);
+
+           // set back virtual particles to real particles on sphere boundary
+           fin>>f_type;
+
+           //if(f_type > real_types) { f_type-=real_types; }
+
+           fbuffer_type.push_back(f_type);
+           fin>>f_mass;      fbuffer_mass.push_back(f_mass);
+
+           // shift back to native coordinate  system
+           fin>>f_posx;      fbuffer_pos_x.push_back(f_posx + ref_xmin);
+           fin>>f_posy;      fbuffer_pos_y.push_back(f_posy + ref_ymin);
+           fin>>f_posz;      fbuffer_pos_z.push_back(f_posz + ref_zmin);
+
+           fin>>f_velx;      fbuffer_vel_x.push_back(f_velx);
+           fin>>f_vely;      fbuffer_vel_y.push_back(f_vely);
+           fin>>f_velz;      fbuffer_vel_z.push_back(f_velz);
+           fin>>f_epot;      fbuffer_epot.push_back(f_epot);
+           fin>>f_erho;      fbuffer_eam_rho.push_back(f_erho);
+    }
+
+    fin.clear(); // resetting bit states
+    fin.close();
+
+    // loop over file buffers for constructing updated sphere
+
+    int p_con=0, v_con=0;
+    for(int count=0; count<fbuffer_id.size()-1;count++){
+
+    	updated_atom.set_mynumber(fbuffer_id[count]);
+    	updated_atom.set_mytype(fbuffer_type[count]);
+    	updated_atom.set_mymass(fbuffer_mass[count]);
+    	updated_atom.set_myposition(fbuffer_pos_x[p_con++],fbuffer_pos_y[p_con++],fbuffer_pos_z[p_con++]);
+    	updated_atom.set_myvelocity(fbuffer_vel_x[v_con++],fbuffer_vel_y[v_con++],fbuffer_vel_z[v_con++]);
+    	updated_atom.set_myepot(fbuffer_epot[count]);
+
+    	// appending particle instance to sphere cell list
+    	sphere_new.add_particle(updated_atom);
+    }
+
+    //----------------------------------------------------------------//
+    //                  check here the acceptance condition
+    //----------------------------------------------------------------//
+
+    int check_type=0;     // type of acceptance condition
+
+    accep_tag = acceptance_check(check_type,old_sphere_conf,sphere_new);
+
+
+    if(prank == test_rank){
+         cout <<"=====================================" << endl;
+         cout <<"    Sphere  File Reading part         " << endl;
+         cout <<"           My rank : "<< prank << endl;
+         cout <<"------------------------------------ " << endl;
+
+         cout << "  fbuffer_id size     : " <<  fbuffer_id.size()   << endl;
+         cout << "  fbuffer_mass size   : " <<  fbuffer_mass.size() << endl;
+         cout << "  fbuffer_pos_x size  : " <<  fbuffer_pos_x.size() << endl;
+         cout << "  fbuffer_pos_y size  : " <<  fbuffer_pos_y.size() << endl;
+         cout << "  fbuffer_pos_z size  : " <<  fbuffer_pos_z.size() << endl;
+
+         cout << "  fbuffer_vel_x size  : " <<  fbuffer_vel_x.size() << endl;
+         cout << "  fbuffer_vel_y size  : " <<  fbuffer_vel_y.size() << endl;
+         cout << "  fbuffer_vel_z size  : " <<  fbuffer_vel_z.size() << endl;
+
+         cout << "  fbuffer_epot size   : " << fbuffer_epot.size() << endl;
+         cout << "  fbuffer_eam_rho size: " << fbuffer_eam_rho.size()<< endl;
+
+         cout << "  " << endl;
+
+         cout <<" sphere_new particles count : "<< sphere_new.get_nparticles()<<endl;
+
+         cout <<" Acceptance decision : " << accep_tag << endl;
+
+         cout <<"=====================================" << endl;
+    }
+
+//    //----------------------------------------------------------------//
+//    //           2- Updating and shifting part                        //
+//    //----------------------------------------------------------------//
+//
+//
+//	// possible neighbor index as per window location
+//
+//	int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
+//	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
+//	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
+//
+//
+//	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
+//
+//	// Old assignment
+//	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
+//	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
+//
+//	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
+//
+//
+//	// ==========================================================
+//	// Detect neighbor processes (maximum 7 if periodicity is enabled in all direction) as per window position
+//	// ==========================================================
+//
+//    // select neighbors as per sample window position
+//	int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
+//
+//	// send neighbors (to whom I send)        ---- process communications (in z direction)
+//	int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
+//
+//	// Receive neighbors (from whom I receive) ----- process communications (in z direction)
+//	int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
+//
+//    // send neighbors (to whom I send) -----  process communications (in x/y direction)
+//	int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
+//
+//	// Receive neighbors (from whom I receive) -----  process communications (in x/y direction)
+//	int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
+//
+//    // prepare neighbor rank lists from whom I received sphere portions (if any)
+//	int rec_nb_rank[7];
+//
+//	// get my process global coordinate
+//	ivec3d gcoord = get_cpu_gcoord(prank,comm_name);
+//	int x = gcoord.x; int y = gcoord.y; int z = gcoord.z; // [ x y z] -- this process coordinate from MPI Cartesian system
+//
+//
+//	for(int ind=0;ind<4;ind++){
+//		rec_nb_rank[ind] = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+//	}
+//
+//	for(int ind=0;ind<3;ind++){
+//		rec_nb_rank[4+ind] = get_cpu_rank(x+x_recv_next[ind],y+y_recv_next[ind],z+z_recv_next[ind],comm_name);
+//	}
+//
+//	if(prank == test_rank){
+//		cout << "+++++++++++++++++++++++++++++++++" << endl;
+//        cout << " from read update config " << endl;
+//		cout << " My rank : " << prank << endl;
+//		for(int i=0;i<7;i++){
+//          cout << " rec_nb_rank["<<i<<"]"<<rec_nb_rank[i] << endl;
+//		}
+//
+//		cout << "+++++++++++++++++++++++++++++++++" << endl;
+//	}
+
+//	// N1 N2 N4 N6 N3 N5 N7
+//	double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
+//
+//	// particle counters for neighbor communications
+//    long tot_part_1 =0, tot_part_2 =0, tot_part_3 =0, tot_part_4 =0, tot_part_5 =0, tot_part_6 =0, tot_part_7 =0;
+//
+//    // list of neighbor export particles counter
+//    long* to_send_list[7] = {&tot_part_1,&tot_part_2,&tot_part_3,&tot_part_4,&tot_part_5,&tot_part_6,&tot_part_7};
+//
+//	// allocate memory (to send to neighbors)
+//
+//    long buff_size =sphere_new.get_nparticles();
+//
+//	nb_0 = new double [buff_size*10]; nb_1= new double [buff_size*10]; nb_2 = new double [buff_size*10];
+//	nb_3 = new double [buff_size*10]; nb_4= new double [buff_size*10]; nb_5 = new double [buff_size*10];
+//	nb_6 = new double [buff_size*10];
+//
+//	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
+
+    // Update if configuration get accepted
+
+//    if(accep_tag){
+//
+//            particle atom;
+//
+//            long buf_ind, total_particles=0;
+//            cout<< "Updating particle attributes " << endl;
+//
+//            // temporary holder for particle attributes
+//    		double temp_id; double temp_type;
+//    		double temp_mass, temp_epot, dist_check;
+//    		double temp_vel_x,temp_vel_y,temp_vel_z;
+//            double temp_pos_x,temp_pos_y,temp_pos_z;
+//
+//            double inst_pos[3];
+//
+//            ivec3d cpu_fact,cell_glob_coord,cell_loc_coord, nb_cpu_gcoord;
+//            int loc_rank , target, cell_index, type_check;
+//
+//            long particle_id;
+//
+//            // get total no of cells in my CPU block
+//            long total_cells = bobj.get_cell_list_size();
+//
+//            for (int i=0; i< (fbuffer_id.size()-1); i++){ // loop over read data
+//
+//            	type_check = fbuffer_type.at(i);
+//
+//            	if(type_check < real_types){ // ignore spherical wall particles (CHECK: reconsider this!!)
+//
+//            	    buf_ind = 0;                      // initialize for each buffer step
+//            	    // attributes assignments
+//            	    temp_id     = (double) fbuffer_id.at(i);
+//                    temp_type   = (double) fbuffer_type.at(i);       // type conversion for buffer type consistency
+//            	    temp_mass   = fbuffer_mass.at(i);
+//
+//            	    // position assignments
+//            	    temp_pos_x  = fbuffer_pos_x.at(i);
+//            	    temp_pos_y  = fbuffer_pos_y.at(i);
+//            	    temp_pos_z  = fbuffer_pos_z.at(i);
+//
+//             	    // global boundary check and position update to actual box dimensions
+//             	    if (fbuffer_pos_x.at(i) < 0.0)               temp_pos_x += simbox_size.x ;
+//             	    if (fbuffer_pos_x.at(i) > simbox_size.x)     temp_pos_x -= simbox_size.x ;
+//             	    if (fbuffer_pos_y.at(i) < 0.0)               temp_pos_y += simbox_size.y ;
+//             	    if (fbuffer_pos_y.at(i) > simbox_size.y)     temp_pos_y -= simbox_size.y ;
+//             	    if (fbuffer_pos_z.at(i) < 0.0)               temp_pos_z += simbox_size.z ;
+//             	    if (fbuffer_pos_z.at(i) > simbox_size.z)     temp_pos_z -= simbox_size.z ;
+//
+//
+//                    // velocity
+//            	    temp_vel_x  = fbuffer_vel_x.at(i);
+//            	    temp_vel_y  = fbuffer_vel_y.at(i);
+//            	    temp_vel_z  = fbuffer_vel_z.at(i);
+//
+//                    // potential energy
+//            	    temp_epot   = fbuffer_epot.at(i);
+//
+//            	    inst_pos[0] = temp_pos_x; inst_pos[1] = temp_pos_y; inst_pos[2] = temp_pos_z;
+//
+//             	    // global cell coordinate from particle position
+//            		cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim); // New try with my method
+//
+//         		    // CPU global coordinate from cell global coordinate
+//         		    nb_cpu_gcoord.x = cell_glob_coord.x / cpu_cell_dim.x;
+//         		    nb_cpu_gcoord.y = cell_glob_coord.y / cpu_cell_dim.y;
+//         		    nb_cpu_gcoord.z = cell_glob_coord.z / cpu_cell_dim.z;
+//
+//         		    // CPU rank
+//         		    loc_rank = get_cpu_rank(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z,comm_name);
+//
+//         		    // particle belongs to neighbor
+//         		    if (loc_rank != mc_prank){
+//         		        //******************************************
+//         		        // if loc_rank != my rank fill it in target buffer
+//         		        //****************************
+//
+//         			    // identify buffer target as per rank
+//         			    for(int ind=0; ind<7;ind++){
+//         				    if(rec_nb_rank[ind] == loc_rank) target=ind;
+//         			    }
+//
+//         			    // buffer size counter (start filling from last index +1)
+//         			    //buf_ind += buff_size[target];
+//
+//         			   buf_ind = *to_send_list[target];
+//
+//         			    //*(nb_buffer[j]+buf_counter++)  = temp_id;
+//
+//         			    // ADD TO BUFFER nb_buffer
+//                        *(nb_buffer[target]+buf_ind++)  = temp_id;
+//                        *(nb_buffer[target]+buf_ind++)  = temp_type;
+//                        *(nb_buffer[target]+buf_ind++)  = temp_mass;
+//                        *(nb_buffer[target]+buf_ind++)  = temp_pos_x;
+//                        *(nb_buffer[target]+buf_ind++)  = temp_pos_y;
+//                        *(nb_buffer[target]+buf_ind++)  = temp_pos_z;
+//                        *(nb_buffer[target]+buf_ind++)  = temp_vel_x;
+//                        *(nb_buffer[target]+buf_ind++)  = temp_vel_y;
+//                        *(nb_buffer[target]+buf_ind++)  = temp_vel_z;
+//                        *(nb_buffer[target]+buf_ind++)  = temp_epot;
+//
+//                        // updating buffer size for every particle belongs to it
+//                        *to_send_list[target] = buf_ind;
+//
+////                        buff_size[target] = buf_ind-1; // check it!!
+//
+//         		    }
+//
+//         		    else{ // particles from my CPU
+//
+//         		        // CPU global position
+//         		        cpu_fact = get_cpu_gcoord(loc_rank,comm_name);
+//
+//         		        // get cell local coordinate
+//         		        cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact,cpu_cell_dim);
+//
+//         		        // to get memory index of cell in cell list
+//
+//         		 		cell_index = bobj.cell_with_lcoord(cell_loc_coord,total_cells).get_cell_id(); // expensive!!!!
+//
+//         		 		//particle_id = fbuffer_id.at(i);
+//
+//         		        // defining particle attributes
+//         		        atom.set_mynumber(fbuffer_id.at(i));
+//         		        atom.set_mytype(fbuffer_type.at(i));
+//         		        atom.set_mymass(fbuffer_mass.at(i));
+//         		        atom.set_myposition(fbuffer_pos_x.at(i), fbuffer_pos_y.at(i), fbuffer_pos_z.at(i));
+//         		        atom.set_myvelocity(fbuffer_vel_x.at(i),fbuffer_vel_y.at(i),fbuffer_vel_z.at(i));
+//         		        atom.set_myepot(fbuffer_epot.at(i));
+//
+//         		        // update particle attributes in main location
+//         		        // IMPORTANT CHECK: whether it may jump across domain??
+//
+//         		        // have to revise such that add the particle directly instead of update
+//         		        update_particle(bobj,cell_index,atom);
+//
+//         		    }
+//
+//                }// spherical wall check
+//            } // for loop read data
+//
+//            // assign buffer size to each neighbor CPU
+//
+//            for (int r_count=0; r_count<7; r_count++){
+//    	      total_particles       = buff_size[r_count] * 0.1 ;  // 10 attributes for each particle
+//              *(nb_buffer[r_count])  = (double) total_particles;  // each buffer first location has particles count
+//
+//
+//            }
+//
+//	} // acceptance condition
+//
+//	else{ // rejected condition
+//
+//		for(int j=0; j<7; j++){
+//			*(nb_buffer[j]) = 0.0; // assign all neighbor buffer size to 0
+//		}
+//	}
+
+
+}
+
+int acceptance_check(int type,celltype old_sphere,celltype new_sphere){
+
+	int flag=0,old_type,new_type;
+	double epot_old =0.0,epot_new =0.0, avg_epot_old =0.0, avg_epot_new = 0.0;
+    long old_count=0, new_count=0;
+
+	// Energy computation
+    if(type == 0){
+
+    	// sanity check
+    	if (old_sphere.get_nparticles() == new_sphere.get_nparticles()){
+    		cout<< " Sphere check: constant no of particles " << endl;
+
+    		// loop over particles in old and new sphere
+    		for(long i=0;i<old_sphere.get_nparticles();i++){
+
+    			  old_type = old_sphere.get_particle(i).get_mytype();
+    			  new_type = new_sphere.get_particle(i).get_mytype();
+
+                  // start from here
+    			  if( old_type == 0 || old_type == 1 ){
+    				  epot_old += old_sphere.get_particle(i).get_myepot();
+                      old_count++;
+    			  }
+
+    			  if( new_type == 0 || new_type == 1 ){
+    				  epot_new += new_sphere.get_particle(i).get_myepot();
+                      new_count++;
+    			  }
+    		}
+
+    		// compute average epot (include other criteria later)
+    		avg_epot_old = epot_old / old_count;
+    		avg_epot_new = epot_new / new_count;
+
+    		cout << "-----------------------------------------" << endl;
+    		cout << " Inside acceptance condition method  " << endl;
+    		cout << "-----------------------------------------" << endl;
+    		cout << " avg_epot_old :  " << avg_epot_old << endl;
+    		cout << " avg_epot_new :  " << avg_epot_new << endl;
+    		cout << "-----------------------------------------" << endl;
+
+    		if (avg_epot_new < avg_epot_old){
+    			flag = 1;
+    		}
+    	}
+    	else{
+    		cerr<< " Sphere check: inconsistent no of particles / broken configuration " << endl;
+    	}
+    }
+
+	return flag;
+}
 
 
 int get_cpu_rank(int inde0,int inde1,int inde2, MPI_Comm c_name){

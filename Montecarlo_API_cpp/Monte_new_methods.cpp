@@ -725,10 +725,6 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
 	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
 
-	// New assignment
-//	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {1,0,0}; ivec3d win_pos_2 = {0,0,1}; ivec3d win_pos_3 = {1,0,1};
-//	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {1,1,0}; ivec3d win_pos_6 = {0,1,1}; ivec3d win_pos_7 = {1,1,1};
-
 	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
 
 	// neighbor CPU global coordinate
@@ -1046,23 +1042,24 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 //
 //########################################################################################################################################################
 
-	// cell catalogue
-	// cell_cat[0] - sphere cell
+	// cell_list  catalog
+
+	// *(catalog+0) - &sphere cell
 	// --- list of neighbors to whom I send my particles for sphere construction
-	// cell_cat[1] - neighbor 1
-	// cell_cat[2] - neighbor 2
-	// cell_cat[3] - neighbor 3
-	// cell_cat[4] - neighbor 4
-	// cell_cat[5] - neighbor 5
-	// cell_cat[6] - neighbor 6
-    // cell_cat[7] - my list of particles for sphere construction
+	// *(catalog+1) - &neighbor 1
+	// *(catalog+2) - &neighbor 2
+	// *(catalog+3) - &neighbor 3
+	// *(catalog+4) - &neighbor 4
+	// *(catalog+5) - &neighbor 5
+	// *(catalog+6) - &neighbor 6
+    // *(catalog+7) - &neighbor 7
+	// *(catalog+8) - &my list of particles for sphere construction
 
-	celltype cat_1,cat_2,cat_3,cat_4,cat_5,cat_6,cat_7,cat_8;
-	//celltype cell_cat[8] = {&cat_1,&cat_2,&cat_3,&cat_4,&cat_5,&cat_6,&cat_7,&cat_8};
+	// cell list contain set of particles exported for sphere construction
+	// 1-7 neighbors, my_CPU
+	celltype cat_nb_0,cat_nb_1,cat_nb_2,cat_nb_3,cat_nb_4,cat_nb_5,cat_nb_6,cat_my_list;
 
-	//celltype cell_cat[8] = {cat_1,cat_2,cat_3,cat_4,cat_5,cat_6,cat_7,cat_8};
-
-	//celltype cell_cat[8];
+	celltype catalog_list[8] = {cat_nb_0,cat_nb_1,cat_nb_2,cat_nb_3,cat_nb_4,cat_nb_5,cat_nb_6,cat_my_list};
 
     // defining zone limits
     int x_start=0,  x_mid = cpu_cell_dim.x/2,    x_end = cpu_cell_dim.x;   // zone limit parameters in x direction
@@ -1303,6 +1300,11 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
     double* pos_holder, buffer_holder;
 	int nb_ptr=0;
 
+	// holders for filling particle catalog
+	particle part_holder;
+    ivec3d lcoord_holder;
+    ivec3d gcoord_holder;
+
 //	if(prank == test_rank){
 //	    cout << "================================================" << endl;
 //		cout << " Received attributes check data_list " << endl;
@@ -1315,6 +1317,8 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 //
 //		cout << "================================================" << endl;
 //	}
+
+	// sweep test part
 
 	for(int j=0; j<7;j++){ // loop over all neighbor CPU
 
@@ -1341,6 +1345,12 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 //	    	    	cout << " Export cell global coordinate : " << nb_cells[k].get_cell_glob_coord().x<<" "<<nb_cells[k].get_cell_glob_coord().y
 //	    	    			<<" "<<nb_cells[k].get_cell_glob_coord().y<< endl;
 //	    	    }
+
+
+                //gcoord_holder = nb_cells[k].get_cell_glob_coord();
+
+                lcoord_holder = nb_cells[k].get_cell_loc_coord();
+
 
 	    	    total_particles=0;
 
@@ -1379,7 +1389,6 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	                                           temp_vel  =  nb_cells[k].get_particle(val).get_myvelocity();
 	                                           temp_epot =  nb_cells[k].get_particle(val).get_myepot();
 
-
 	                                           // ADD TO BUFFER nb_buffer
 
 	                                           *(nb_buffer[j]+buf_counter++)  = temp_id;
@@ -1405,6 +1414,18 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	                                    temp_pos  =  curr_pos;
 	                                    temp_vel  =  nb_cells[k].get_particle(val).get_myvelocity();
 	                                    temp_epot =  nb_cells[k].get_particle(val).get_myepot();
+
+	                                    // add particle to catalog list
+
+	                                    //part_holder = bobj.cell_with_lcoord(lcoord_holder,ncells).get_particle(val);
+
+	                                    part_holder = nb_cells[k].get_particle(val);
+
+                                        catalog_list[j].add_particle(part_holder);
+//
+//	                                    // Now remove particles exported to neighbor CPU from cellblock object
+//                                        bobj.cell_with_lcoord(lcoord_holder,ncells).delete_particle(part_holder,val);
+
 
 	                                    // ADD TO BUFFER nb_nb_buffer_0
 
@@ -1857,20 +1878,6 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
     // prepare SAMPLE cell list as per sample window id for my own CPU
 
-//    for(int i=zone_limit[win_id].xmin;i<=zone_limit[win_id].xmax;i++){
-//    	for(int j=zone_limit[win_id].ymin;j<=zone_limit[win_id].ymax;j++){
-//    		for(int k=zone_limit[win_id].zmin;k<=zone_limit[win_id].zmax;k++){
-//    			test.x = i; test.y = j; test.z = k;
-//    			sample_cells[count] = bobj.cell_with_lcoord(test,ncells_3);
-//    			// add to sample factor (INCLUDE LATER!!)
-//    			//bobj.cell_with_lcoord(test,ncells_3).add_sample();
-//                count++;
-//    		}// k loop
-//    	}// j loop
-//    }// i loop
-
-
-
     for(int i=0;i<cpu_cell_dim.x;i++){
     	for(int j=0;j<cpu_cell_dim.y;j++){
     		for(int k=0;k<cpu_cell_dim.z;k++){
@@ -1997,6 +2004,18 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 		            }
 		            else{ // include all particles inside mc_rsweep
 
+
+                        // add particle to catalog list
+                        lcoord_holder = sample_cells[j].get_cell_loc_coord();
+
+                        //part_holder = bobj.cell_with_lcoord(lcoord_holder,ncells).get_particle(i);
+
+                         part_holder = sample_cells[j].get_particle(i);
+                         catalog_list[7].add_particle(part_holder);
+//
+//                        // Now remove particles exported to neighbor CPU from cellblock object
+//                        bobj.cell_with_lcoord(lcoord_holder,ncells).delete_particle(part_holder,i);
+
                 	     // shifting origin of coordinate system
                          temp_position_x = atom.get_myposition().x - ref_xmin;
                          temp_position_y = atom.get_myposition().y - ref_ymin;
@@ -2033,11 +2052,17 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
     // creating reference sphere configuration
     sphere_old = sphere_cell;
 
-    //cell_cat[0] = &sphere_old;
+    // catalog update part
+    *(catalog+0) = &sphere_old;
+    *(catalog+1) = &catalog_list[0];
+	*(catalog+2) = &catalog_list[1];
+	*(catalog+3) = &catalog_list[2];
+	*(catalog+4) = &catalog_list[3];
+	*(catalog+5) = &catalog_list[4];
+	*(catalog+6) = &catalog_list[5];
+	*(catalog+7) = &catalog_list[6];
+	*(catalog+8) = &catalog_list[7];
 
-    //cell_cat[0] = sphere_old;
-
-    *(catalog+0)  = &sphere_old;
 
     // ***********************************************************************
     // INCLUDE OTHER TWO TRIAL MOVES HERE
@@ -2050,6 +2075,21 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
         cout<< " Total particles for sphere :  " << rec_counter << endl;
         cout<< " Total particles (neighbor + my part ) sphere_cell : "<< sphere_cell.get_nparticles()<<endl;
         cout<< " Total particles (neighbor + my part ) sphere_old: "<< sphere_old.get_nparticles()<<endl;
+
+        cout << "------- cell catalog check ---- " << endl;
+        int loc_sum=0;
+        for(int i=0; i<8; i++){
+
+        	cout << "no of particles in  catalog_list [ " <<i<<" ] :" << catalog_list[i].get_nparticles() << endl;
+        	loc_sum+=catalog_list[i].get_nparticles();
+        }
+
+        cout <<" total particles for neighbor : "<< loc_sum << endl;
+        cout << "---------------------------------"<< endl;
+
+
+
+
         cout<< " " << endl;
     	cout<< "===============================================" << endl;
     }

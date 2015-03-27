@@ -345,9 +345,9 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     	rand_particle.set_myposition(42.8808,42.8842,41.4575);
     }
 
-    celltype sphr, nbr_1,nbr_2,nbr_3,nbr_4,nbr_5,nbr_6,my_list;
+    celltype sphr, nbr_1,nbr_2,nbr_3,nbr_4,nbr_5,nbr_6,nbr_7,my_list;
 
-    celltype* ptr_list[8]={&sphr,&nbr_1,&nbr_2,&nbr_3,&nbr_4,&nbr_5,&nbr_6,&my_list};
+    celltype* ptr_list[9]={&sphr,&nbr_1,&nbr_2,&nbr_3,&nbr_4,&nbr_5,&nbr_6,&nbr_7,&my_list};
 
     // construct sphere
     celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,

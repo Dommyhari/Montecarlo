@@ -246,7 +246,7 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	int win_id = 0;  // Hardcoded for testing
 
-	int test_cpu = 5;
+	int test_cpu = 0;
 
 	int dbug_flag = 0;   // debug flag -- print check statements
 
@@ -345,8 +345,15 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     	rand_particle.set_myposition(42.8808,42.8842,41.4575);
     }
 
+    celltype sphr, nbr_1,nbr_2,nbr_3,nbr_4,nbr_5,nbr_6,my_list;
+
+    celltype* ptr_list[8]={&sphr,&nbr_1,&nbr_2,&nbr_3,&nbr_4,&nbr_5,&nbr_6,&my_list};
+
     // construct sphere
-    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,mc_cpu_cell_dim);
+    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
+    		mc_cpu_cell_dim,ptr_list);
+
+
 
 
 	// debug/control checking part
@@ -401,7 +408,9 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     //}
 
     // read or update config
-    read_update_config(win_id,rand_particle,r_partic,cell_sample,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name);
+    //read_update_config(win_id,rand_particle,r_partic,cell_sample,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name);
+
+    read_update_config(win_id,rand_particle,r_partic,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
 
     // edited // read_update_config(sample_id, file_name ,sam_particle,c_obj);
 

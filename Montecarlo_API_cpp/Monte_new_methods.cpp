@@ -701,7 +701,7 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 }
 
 celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat,
-		int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim){
+		int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim,celltype** catalog){
 
 	//########################################################################################################################################################
 	//
@@ -1045,6 +1045,24 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 //
 //
 //########################################################################################################################################################
+
+	// cell catalogue
+	// cell_cat[0] - sphere cell
+	// --- list of neighbors to whom I send my particles for sphere construction
+	// cell_cat[1] - neighbor 1
+	// cell_cat[2] - neighbor 2
+	// cell_cat[3] - neighbor 3
+	// cell_cat[4] - neighbor 4
+	// cell_cat[5] - neighbor 5
+	// cell_cat[6] - neighbor 6
+    // cell_cat[7] - my list of particles for sphere construction
+
+	celltype cat_1,cat_2,cat_3,cat_4,cat_5,cat_6,cat_7,cat_8;
+	//celltype cell_cat[8] = {&cat_1,&cat_2,&cat_3,&cat_4,&cat_5,&cat_6,&cat_7,&cat_8};
+
+	//celltype cell_cat[8] = {cat_1,cat_2,cat_3,cat_4,cat_5,cat_6,cat_7,cat_8};
+
+	//celltype cell_cat[8];
 
     // defining zone limits
     int x_start=0,  x_mid = cpu_cell_dim.x/2,    x_end = cpu_cell_dim.x;   // zone limit parameters in x direction
@@ -2015,6 +2033,12 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
     // creating reference sphere configuration
     sphere_old = sphere_cell;
 
+    //cell_cat[0] = &sphere_old;
+
+    //cell_cat[0] = sphere_old;
+
+    *(catalog+0)  = &sphere_old;
+
     // ***********************************************************************
     // INCLUDE OTHER TWO TRIAL MOVES HERE
     // ***********************************************************************
@@ -2104,6 +2128,9 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
     delete[] my_4;delete[] my_5;delete[] my_6;
 
 	return sphere_old;
+
+    //return cell_cat;
+
 }
 
 // pass IMD_executable and param file as arguments
@@ -2182,8 +2209,8 @@ void do_local_mdrun(string bin_name,string param_name,int prank){
     system(cmd4_ptr); // remove param clone
 }
 
-void read_update_config (int win_id,particle pobj,cellblock bobj,celltype old_sphere_conf
-		,double* data_list,int prank,int test_rank,vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name){
+void read_update_config (int win_id,particle pobj,cellblock bobj,double* data_list,
+		int prank,int test_rank,vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name,celltype** catalog){
 
 
 	vec3d simbox_size;
@@ -2299,7 +2326,7 @@ void read_update_config (int win_id,particle pobj,cellblock bobj,celltype old_sp
 
     int check_type=0;     // type of acceptance condition
 
-    accep_tag = acceptance_check(check_type,old_sphere_conf,sphere_new);
+    accep_tag = acceptance_check(check_type,**(catalog+0),sphere_new);
 
 
     if(prank == test_rank){
@@ -2538,25 +2565,25 @@ void read_update_config (int win_id,particle pobj,cellblock bobj,celltype old_sp
 
          		    else{ // particles from my CPU
 
-//         		        // CPU global position
-//         		        cpu_fact = get_cpu_gcoord(loc_rank,comm_name);
-//
-//         		        // get cell local coordinate
-//         		        cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact,cpu_cell_dim);
-//
-//         		        // to get memory index of cell in cell list
-//
-//         		 		cell_index = bobj.cell_with_lcoord(cell_loc_coord,total_cells).get_cell_id(); // expensive!!!!
-//
-//         		 		//particle_id = fbuffer_id.at(i);
-//
-//         		        // defining particle attributes
-//         		        atom.set_mynumber(fbuffer_id.at(i));
-//         		        atom.set_mytype(fbuffer_type.at(i));
-//         		        atom.set_mymass(fbuffer_mass.at(i));
-//         		        atom.set_myposition(fbuffer_pos_x.at(i), fbuffer_pos_y.at(i), fbuffer_pos_z.at(i));
-//         		        atom.set_myvelocity(fbuffer_vel_x.at(i),fbuffer_vel_y.at(i),fbuffer_vel_z.at(i));
-//         		        atom.set_myepot(fbuffer_epot.at(i));
+         		        // CPU global position
+         		        cpu_fact = get_cpu_gcoord(loc_rank,comm_name);
+
+         		        // get cell local coordinate
+         		        cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact,cpu_cell_dim);
+
+         		        // to get memory index of cell in cell list
+
+         		 		cell_index = bobj.cell_with_lcoord(cell_loc_coord,total_cells).get_cell_id(); // expensive!!!!
+
+         		 		particle_id = fbuffer_id.at(i);
+
+         		        // defining particle attributes
+         		        atom.set_mynumber(fbuffer_id.at(i));
+         		        atom.set_mytype(fbuffer_type.at(i));
+         		        atom.set_mymass(fbuffer_mass.at(i));
+         		        atom.set_myposition(fbuffer_pos_x.at(i), fbuffer_pos_y.at(i), fbuffer_pos_z.at(i));
+         		        atom.set_myvelocity(fbuffer_vel_x.at(i),fbuffer_vel_y.at(i),fbuffer_vel_z.at(i));
+         		        atom.set_myepot(fbuffer_epot.at(i));
 //
 //         		        // update particle attributes in main location
 //         		        // IMPORTANT CHECK: whether it may jump across domain??

@@ -412,8 +412,6 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     read_update_config(win_id,rand_particle,r_partic,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
 
-    // edited // read_update_config(sample_id, file_name ,sam_particle,c_obj);
-
     // fill mc container
 
     // edited // fill_mc_container(c_obj); // (this method could be defined locally here!!)

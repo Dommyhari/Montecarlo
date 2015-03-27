@@ -51,6 +51,7 @@ void do_local_mdrun(string bin_name,string param_name,int prank);
 
 int acceptance_check(int type,celltype old_sphere,celltype new_sphere);
 
+// new revision with catalog
 void read_update_config (int win_id,particle pobj,cellblock bobj,double* data_list,int prank,int test_rank,
 		vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name,celltype** catalog);
 

@@ -2326,8 +2326,8 @@ void read_update_config (int win_id,particle pobj,cellblock bobj,double* data_li
 
     int check_type=0;     // type of acceptance condition
 
+    // new argument catalog
     accep_tag = acceptance_check(check_type,**(catalog+0),sphere_new);
-
 
     if(prank == test_rank){
          cout <<"=====================================" << endl;

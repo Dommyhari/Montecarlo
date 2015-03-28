@@ -1304,6 +1304,8 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	particle part_holder;
     ivec3d lcoord_holder;
     ivec3d gcoord_holder;
+    vector<long> nb_part_id; // list of particles id exported to neighbor
+    vector<long> my_part_id; // list of particles id for my sphere construction
 
 //	if(prank == test_rank){
 //	    cout << "================================================" << endl;
@@ -1417,15 +1419,17 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
 	                                    // add particle to catalog list
 
-	                                    //part_holder = bobj.cell_with_lcoord(lcoord_holder,ncells).get_particle(val);
+	                                    part_holder = bobj.cell_with_lcoord(lcoord_holder,ncells).get_particle(val);
 
-	                                    part_holder = nb_cells[k].get_particle(val);
+	                                    //part_holder = nb_cells[k].get_particle(val);
 
                                         catalog_list[j].add_particle(part_holder);
 //
-//	                                    // Now remove particles exported to neighbor CPU from cellblock object
-//                                        bobj.cell_with_lcoord(lcoord_holder,ncells).delete_particle(part_holder,val);
+	                                    // Now remove particles exported to neighbor CPU from cellblock object
+//                                        bobj.cell_with_lcoord(lcoord_holder,ncells).delete_particle(val);
 
+                                        // pushing particle index
+                                        nb_part_id.push_back(temp_id);
 
 	                                    // ADD TO BUFFER nb_nb_buffer_0
 
@@ -1441,6 +1445,9 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	                                    *(nb_buffer[j]+buf_counter++) = temp_epot;
 
 	                                    total_particles++;
+
+	                                    // updated
+	                                    part_count = nb_cells[k].get_nparticles(); //get total particles
 		             	            }
 
 		                      }  // cut-off check
@@ -1454,6 +1461,10 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 			    	  cout << " my rank : "<< prank << " "<< " Neigh ID : "<< j << " Added  particles to buffer count :   "<< buf_counter * 0.1 << endl;
 
 			    	 }
+
+	    	         // deletion part of included particle
+
+	    	         // here clean instantaneously the particle ids after writing delete list method in class
 
 	    	    } // loop over each neighbor sub total
 	            nb_ptr += count_list[j]; // updating neigbor pointer
@@ -2008,12 +2019,12 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
                         // add particle to catalog list
                         lcoord_holder = sample_cells[j].get_cell_loc_coord();
 
-                        //part_holder = bobj.cell_with_lcoord(lcoord_holder,ncells).get_particle(i);
+                        part_holder = bobj.cell_with_lcoord(lcoord_holder,ncells).get_particle(i);
 
-                         part_holder = sample_cells[j].get_particle(i);
+                         //part_holder = sample_cells[j].get_particle(i);
                          catalog_list[7].add_particle(part_holder);
 //
-//                        // Now remove particles exported to neighbor CPU from cellblock object
+                        // Now remove particles exported to neighbor CPU from cellblock object
 //                        bobj.cell_with_lcoord(lcoord_holder,ncells).delete_particle(part_holder,i);
 
                 	     // shifting origin of coordinate system
@@ -2028,6 +2039,10 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 	        } // end of cut-off check
 
     	} // loop over particles
+
+    	// Deletion part of included particles
+
+
     } // loop over sample cells
 
     // adding randomly chosen particle of own cpu
@@ -2070,7 +2085,9 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
     if(prank == test_rank){
 
+    	celltype loc_cell;
     	cout<< "===============================================" << endl;
+    	cout<< " --------------  Inside construct sphere ---------" << endl;
     	cout<< " " << endl;
         cout<< " Total particles for sphere :  " << rec_counter << endl;
         cout<< " Total particles (neighbor + my part ) sphere_cell : "<< sphere_cell.get_nparticles()<<endl;
@@ -2078,10 +2095,10 @@ celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* 
 
         cout << "------- cell catalog check ---- " << endl;
         int loc_sum=0;
-        for(int i=0; i<8; i++){
-
-        	cout << "no of particles in  catalog_list [ " <<i<<" ] :" << catalog_list[i].get_nparticles() << endl;
-        	loc_sum+=catalog_list[i].get_nparticles();
+        for(int i=0; i<9; i++){
+        	loc_cell = **(catalog+i);
+        	cout << "no of particles in  **(catalog_list+" <<i<<") :" << loc_cell.get_nparticles() << endl;
+        	loc_sum+=loc_cell.get_nparticles();
         }
 
         cout <<" total particles for neighbor : "<< loc_sum << endl;
@@ -2365,6 +2382,28 @@ void read_update_config (int win_id,particle pobj,cellblock bobj,double* data_li
     //----------------------------------------------------------------//
 
     int check_type=0;     // type of acceptance condition
+
+
+        if(prank == test_rank){
+
+           celltype local_cell;
+           long tot_particles=0; // check variable
+           cout << "****************************************************" << endl;
+
+           for(int i=0; i<9; i++){
+
+        	     local_cell = **(catalog+i);
+
+        	     cout << " No of particles in **(catalog+"<< i << ") : "<< local_cell.get_nparticles()  << endl;
+        	     tot_particles += local_cell.get_nparticles();
+
+           }
+
+           cout << " Total particles removed after Construct sphere in CPU 0 " << tot_particles << endl;
+           cout << "****************************************************" << endl;
+        }
+
+
 
     // new argument catalog
     accep_tag = acceptance_check(check_type,**(catalog+0),sphere_new);

@@ -345,20 +345,9 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     	rand_particle.set_myposition(42.8808,42.8842,41.4575);
     }
 
-    celltype sphr, nbr_1,nbr_2,nbr_3,nbr_4,nbr_5,nbr_6,nbr_7,my_list;
-
-    celltype* ptr_list[9]={&sphr,&nbr_1,&nbr_2,&nbr_3,&nbr_4,&nbr_5,&nbr_6,&nbr_7,&my_list};
-
-    // construct sphere
-    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
-    		mc_cpu_cell_dim,ptr_list);
-
-
-
-
 	// debug/control checking part
 
-    if(mc_prank == 0){
+    if(mc_prank == test_cpu){
 
 
        long tot_particles=0; // check variable
@@ -397,6 +386,35 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
        cout << "  Random particle Epot       : " << rand_particle.get_myepot() << endl;
 
 	}
+
+
+    celltype sphr, nbr_1,nbr_2,nbr_3,nbr_4,nbr_5,nbr_6,nbr_7,my_list;
+
+    celltype* ptr_list[9]={&sphr,&nbr_1,&nbr_2,&nbr_3,&nbr_4,&nbr_5,&nbr_6,&nbr_7,&my_list};
+
+    // construct sphere
+    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
+    		mc_cpu_cell_dim,ptr_list);
+
+
+//    if(mc_prank == test_cpu){
+//
+//       celltype local_cell;
+//       long tot_particles=0; // check variable
+//       cout << "****************************************************" << endl;
+//
+//       for(int i=0; i<9; i++){
+//
+//    	     local_cell = **(ptr_list+i);
+//
+//    	     cout << " No of particles in **(ptr_list+"<< i << ") : "<< local_cell.get_nparticles()  << endl;
+//    	     tot_particles += local_cell.get_nparticles();
+//
+//       }
+//
+//       cout << " Total particles removed after Construct sphere in CPU 0 " << tot_particles << endl;
+//       cout << "****************************************************" << endl;
+//    }
 
 
     //run local MD

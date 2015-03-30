@@ -2332,13 +2332,13 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
 
 	cellblock read_block;
 
-	//celltype del_part_list[9] = {loc_old_sphere,loc_nb0,loc_nb1,loc_nb2,loc_nb3,loc_nb4,loc_nb5,loc_nb6,loc_my};
+	celltype * del_part_list;
+	del_part_list = new celltype [9];
+
 
 	if(prank == test_rank){
 	   long tot_particles = 0;
        for(int i=0; i<bobj.get_cell_list_size(); i++){
- 	             //cout << " No of particles in cell id  [ " << i << " ] : "<< bobj.get_cell(i).get_nparticles()  << endl;
-
     	         tot_particles += bobj.get_cell(i).get_nparticles();
        }
 
@@ -2384,6 +2384,7 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
 
     //string str_fname    = "MC_sphere_config_p_"+to_string(prank)+ ".chkpt";
 
+    // TO BE UPDATED WITH RELAX OR SNAPSHOT FILE
     string str_fname    = "./sphere_out/MC_sphere_config_p_" + to_string(prank) + "_relax.00000.chkpt";
 
     cout<< " sphere file check : " << str_fname << endl;
@@ -2466,11 +2467,7 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
     cout << " particles count in new sphere check " << sphere_new.get_nparticles()<<endl;
     cout <<"==============================================" << endl;
 
-    //----------------------------------------------------------------//
-    //                  check here the acceptance condition
-    //----------------------------------------------------------------//
 
-    int check_type=0;     // type of acceptance condition
 
     // assigning nb_cells from catalog
     loc_old_sphere  = **(catalog+0);
@@ -2483,7 +2480,21 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
     loc_nb6         = **(catalog+7);
     loc_my          = **(catalog+8);
 
+    // assigning delete particles list
+	del_part_list[0] = loc_old_sphere;
+	del_part_list[1] = loc_nb0;
+	del_part_list[2] = loc_nb1;
+	del_part_list[3] = loc_nb2;
+	del_part_list[4] = loc_nb3;
+	del_part_list[5] = loc_nb4;
+	del_part_list[6] = loc_nb5;
+	del_part_list[7] = loc_nb6;
+	del_part_list[8] = loc_my;
 
+	cout<<"+++++++++++++++++++++++++++++++++++++++" << endl;
+	cout<< "Predominant check " << endl;
+	cout<< "del_part_list[0].get_nparticles()" << del_part_list[0].get_nparticles() << endl;
+	cout<<"+++++++++++++++++++++++++++++++++++++++" << endl;
 
     if(prank == test_rank){
 
@@ -2513,6 +2524,12 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
     double my_update_part[10000];
 
     celltype new_portion;
+
+    //----------------------------------------------------------------//
+    //                  check here the acceptance condition
+    //----------------------------------------------------------------//
+
+    int check_type=0;     // type of acceptance condition
 
     // new argument catalog
     accep_tag = acceptance_check(check_type,**(catalog+0),sphere_new);
@@ -2647,6 +2664,8 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
 
         // Update if configuration get accepted
 
+        //accep_tag = 0; (for testing)
+
         if(accep_tag){
 
         	   // delete all my old particles in my CPU
@@ -2780,8 +2799,48 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
     	} // acceptance condition
 
     	else{ // rejected condition
-    	}
-    //
+
+    		// updating my part of CPU
+
+    		particle old_atom;
+            ivec3d cpu_fact,cell_glob_coord,cell_loc_coord, nb_cpu_gcoord;
+            int loc_rank, target, cell_index, type_check;
+            double inst_pos[3];
+            int ncells_loc;
+
+            ncells_loc = bobj.get_cell_list_size();
+
+    		for(long i=0; i<loc_my.get_nparticles();i++ ){
+
+                 old_atom = loc_my.get_particle(i);
+
+                 // assign position
+                 inst_pos[0] = old_atom.get_myposition().x; inst_pos[1] = old_atom.get_myposition().y; inst_pos[2] = old_atom.get_myposition().z;
+
+          	     // global cell coordinate from particle position
+         		 cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim);
+
+      		     // CPU global coordinate from cell global coordinate
+      		     nb_cpu_gcoord.x = cell_glob_coord.x / cpu_cell_dim.x;
+      		     nb_cpu_gcoord.y = cell_glob_coord.y / cpu_cell_dim.y;
+      		     nb_cpu_gcoord.z = cell_glob_coord.z / cpu_cell_dim.z;
+
+      		     // get cell local coordinate
+                 cell_loc_coord = get_cell_loc_coord(cell_glob_coord,nb_cpu_gcoord,cpu_cell_dim);
+
+                 celltype loc_cell_holder = bobj.cell_with_lcoord(cell_loc_coord,ncells_loc);
+
+                 cell_index = loc_cell_holder.get_cell_id();
+
+                 loc_cell_holder.add_particle(old_atom);
+
+                 // updating/set added particle
+                 bobj.set_cell(loc_cell_holder,cell_index);
+
+    		}
+
+    	} // reject condition
+
         if(prank == test_rank){
         	cout << " =================================================" << endl;
             cout << " Updated neighbor particles After check " << endl;
@@ -2797,13 +2856,57 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
         	cout << "       Updated portion part               " << endl;
         	cout << " ========================================" << endl;
         	cout << "  Total particles added in updated portion part : " << new_portion.get_nparticles() << endl;
-
         	cout << " =================================================" << endl;
         }
 
 
-    read_block = bobj;
-    return read_block;
+
+        //-----------------------------------------------------------------------------------------
+        //                                     Phase-3
+        //                      Communicating with neighbors on acceptance decision and no of particles
+        //-----------------------------------------------------------------------------------------
+
+        // decision variables for all neighbors from whom I got sphere portions (to send)
+        // [0]-acceptance_flag; [1]-no of particles;
+        long nb_dec_0[2]={0,0}, nb_dec_1[2]={0,0}, nb_dec_2[2]={0,0}, nb_dec_3[2]={0,0}, nb_dec_4[2]={0,0}, nb_dec_5[2]={0,0}, nb_dec_6[2]={0,0};
+
+        // decision variables from all neighbors to whom I send sphere portions (to receive)
+//        long ** rec_dec_0;
+//        rec_dec_0 = new long* [2];
+
+
+        // assigning decision variables
+        nb_dec_0[0] = accep_tag; nb_dec_0[1] = *to_send_list[0]*0.1;
+        nb_dec_1[0] = accep_tag; nb_dec_1[1] = *to_send_list[1]*0.1;
+        nb_dec_2[0] = accep_tag; nb_dec_2[1] = *to_send_list[2]*0.1;
+        nb_dec_3[0] = accep_tag; nb_dec_3[1] = *to_send_list[3]*0.1;
+        nb_dec_4[0] = accep_tag; nb_dec_4[1] = *to_send_list[4]*0.1;
+        nb_dec_5[0] = accep_tag; nb_dec_5[1] = *to_send_list[5]*0.1;
+        nb_dec_6[0] = accep_tag; nb_dec_6[1] = *to_send_list[6]*0.1;
+
+
+        long** nb_decision;
+        nb_decision = new long* [7];
+
+        nb_decision[0] = nb_dec_0;
+        nb_decision[1] = nb_dec_1;
+        nb_decision[2] = nb_dec_2;
+        nb_decision[3] = nb_dec_3;
+        nb_decision[4] = nb_dec_4;
+        nb_decision[5] = nb_dec_5;
+        nb_decision[6] = nb_dec_6;
+
+
+
+
+        cout << "#####################################################" << endl;
+        cout << " Another assignment check : " <<endl;
+        cout << " *(*(nb_decision+0)+0) :" << *(*(nb_decision+0)+0) << endl;
+        cout << " *(*(nb_decision+0)+1) :" << *(*(nb_decision+0)+1) << endl;
+        cout << "#####################################################" << endl;
+
+        read_block = bobj;
+        return read_block;
 
 
 } // End of read_update config

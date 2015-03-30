@@ -401,21 +401,10 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     cellblock aft_sphere = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
    		mc_cpu_cell_dim,ptr_list);
 
-
-    //run local MD
-
-    //if(mc_prank==0){
-
+    // run Local MD
     do_local_mdrun(md_binary,md_param,mc_prank);
 
-    //}
-
     // read or update config
-
-    //read_update_config(win_id,rand_particle,r_partic,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
-
-    // the correct one
-    //read_update_config(win_id,rand_particle,aft_sphere,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
 
     cellblock read_block = read_update_config(win_id,rand_particle,aft_sphere,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
 

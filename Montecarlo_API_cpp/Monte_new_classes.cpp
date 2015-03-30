@@ -59,6 +59,19 @@ void celltype::add_neighbor(int id, ivec3d position)  {  nbl_list[id] = position
 void celltype::add_sample(void)                       {  sample_fact += 1;        }
 void celltype::update_particle_counter(void)        {  particle_counter += 1; }
 
+void celltype::delete_particle_id(long given_id){
+
+	//DNote: Later sorting algorithm to be included to find particle id faster by binary tree search.
+	// loop over no of particles
+	for(long i=0;i<cell.size();i++){
+
+		if(cell[i].get_mynumber() == given_id){
+			cell.erase(cell.begin()+ i);
+		}
+
+	}
+}
+
 
 // class cellblock methods
 void cellblock::set_mycpu(int cpuid)                  {	mycpu = cpuid;}

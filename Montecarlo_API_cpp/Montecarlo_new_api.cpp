@@ -393,28 +393,13 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     celltype* ptr_list[9]={&sphr,&nbr_1,&nbr_2,&nbr_3,&nbr_4,&nbr_5,&nbr_6,&nbr_7,&my_list};
 
     // construct sphere
-    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
-    		mc_cpu_cell_dim,ptr_list);
+
+//    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
+//    		mc_cpu_cell_dim,ptr_list);
 
 
-//    if(mc_prank == test_cpu){
-//
-//       celltype local_cell;
-//       long tot_particles=0; // check variable
-//       cout << "****************************************************" << endl;
-//
-//       for(int i=0; i<9; i++){
-//
-//    	     local_cell = **(ptr_list+i);
-//
-//    	     cout << " No of particles in **(ptr_list+"<< i << ") : "<< local_cell.get_nparticles()  << endl;
-//    	     tot_particles += local_cell.get_nparticles();
-//
-//       }
-//
-//       cout << " Total particles removed after Construct sphere in CPU 0 " << tot_particles << endl;
-//       cout << "****************************************************" << endl;
-//    }
+    cellblock aft_sphere = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
+   		mc_cpu_cell_dim,ptr_list);
 
 
     //run local MD
@@ -426,9 +411,13 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     //}
 
     // read or update config
-    //read_update_config(win_id,rand_particle,r_partic,cell_sample,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name);
 
-    read_update_config(win_id,rand_particle,r_partic,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
+    //read_update_config(win_id,rand_particle,r_partic,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
+
+    // the correct one
+    //read_update_config(win_id,rand_particle,aft_sphere,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
+
+    cellblock read_block = read_update_config(win_id,rand_particle,aft_sphere,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
 
     // fill mc container
 

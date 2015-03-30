@@ -101,6 +101,8 @@ class celltype{
         //void delete_particle(particle p, int index)    { cell.erase(cell.begin()+ index);}
         void delete_particle(long index)    { cell.erase(cell.begin()+ index);}
 
+        void delete_particle_id(long index);
+
 
 	    // get methods
 	    int get_cell_id()                       { return cell_id;       }  //  cell id

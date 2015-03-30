@@ -44,15 +44,23 @@ int get_cpu_rank(int inde0,int inde1,int inde2, MPI_Comm c_name);
 
 particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank);
 
-celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat
+//celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat
+//		,int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim,celltype** catalog);
+
+cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat
 		,int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim,celltype** catalog);
+
+
 
 void do_local_mdrun(string bin_name,string param_name,int prank);
 
 int acceptance_check(int type,celltype old_sphere,celltype new_sphere);
 
 // new revision with catalog
-void read_update_config (int win_id,particle pobj,cellblock bobj,double* data_list,int prank,int test_rank,
+//void read_update_config (int win_id,particle pobj,cellblock bobj,double* data_list,int prank,int test_rank,
+//		vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name,celltype** catalog);
+
+cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* data_list,int prank,int test_rank,
 		vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name,celltype** catalog);
 
 double scalar_prod(vec3d u, vec3d v);

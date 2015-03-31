@@ -243,16 +243,12 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 	MPI_Barrier(comm_name); // for ordered printing
 
 	int accept_flag = 0; // acceptance flag
-
 	int win_id = 0;  // Hardcoded for testing
-
 	int test_cpu = 0;
-
 	int dbug_flag = 0;   // debug flag -- print check statements
 
 
 	// creating cellblock object
-
 	cellblock c_obj, r_cell,r_partic, r_vel;
 
 	// CPU box dimension
@@ -261,34 +257,33 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 	cpu_box_diag.x = mc_cpu_box_x.x; cpu_box_diag.y = mc_cpu_box_y.y; cpu_box_diag.z = mc_cpu_box_z.z;
 
 	//ncells_cpu = calc_ncells_cpu(cpu_box_diag,mc_cell_dim);
-
 	c_obj.set_mycpu(mc_prank);
 
 	// construct cells
-
 	r_cell = make_cells(c_obj,cpu_box_diag, mc_cell_dim,cpu_gcoord,mc_cpu_cell_dim,mc_prank);
 
-
-    // create particles
-
+	// create particles
     r_partic = make_particles(r_cell,mc_tatoms_cpu, mc_global_cell_dim,cpu_gcoord,mc_cpu_cell_dim,
         		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot,mc_prank,dbug_flag,mc_cell_dim);
-
 
     // clear STL container (once particle objects are created)
 
     // (NOT REQUIRED DURING TESTING PHASE -- INCLUDE LATER -- in sync with fill_mc_container)
-//	       mc_atomnumber.clear();
-//	       mc_atomtypes.clear();
-//         mc_atommass.clear();
-//         mc_positions.clear();
-//         mc_epot.clear();
+	mc_atomnumber.clear();
+	mc_atomtypes.clear();
+    mc_atommass.clear();
+    mc_positions.clear();
+    mc_epot.clear();
 
 
     // create velocities (T != 0K)
 	if(mc_temp>0){
+		//cellblock  r_vel = new cellblock;
+
 		r_vel = create_maxwell_velocities(r_partic,mc_temp,mc_restriction,mc_prank,dbug_flag);
 		r_partic = r_vel;
+
+		//delete r_vel;
 	}
 
 
@@ -394,10 +389,6 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     // construct sphere
 
-//    celltype cell_sample = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
-//    		mc_cpu_cell_dim,ptr_list);
-
-
     cellblock aft_sphere = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
    		mc_cpu_cell_dim,ptr_list);
 
@@ -406,11 +397,57 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
     // read or update config
 
-    cellblock read_block = read_update_config(win_id,rand_particle,aft_sphere,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
+    cellblock loc_obj = read_update_config(win_id,rand_particle,aft_sphere,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
 
     // fill mc container
 
     // edited // fill_mc_container(c_obj); // (this method could be defined locally here!!)
+
+    vector<int> mod_mc_atomtypes;        //  vector container for atom types
+    vector<long> mod_mc_atomnumber;      //  vector container for atom number
+    vector<double> mod_mc_atommass;      //  vector container for atom mass
+    vector<double> mod_mc_positions;     //  vector container for atom positions
+    vector<double> mod_mc_velocities;    //  vector container for atom velocities
+    vector<double> mod_mc_epot;          //  vector container for atom potential energy
+
+
+//	// loop over cells
+//
+//    celltype main_cell;
+//    particle main_part;
+//
+//	for (long i=0; i<loc_obj.get_cell_list_size();i++){
+//
+//		par_count = loc_obj.get_cell(i).get_nparticles();
+//
+//		for(long j=0; j<par_count;j++ ){
+//
+//			main_part = loc_obj.get_cell(i).get_particle(j);
+//
+//            // add particle attributes
+//			mod_mc_atomnumber.push_back(main_part.get_mynumber());    // atom id
+//			mod_mc_atomtypes.push_back(main_part.get_mytype());       // atom type
+//            mod_mc_atommass.push_back(main_part.get_mymass());        // atom mass
+//			mod_mc_positions.push_back(main_part.get_myposition().x);
+//			mod_mc_positions.push_back(main_part.get_myposition().y); // atom positions
+//			mod_mc_positions.push_back(main_part.get_myposition().z);
+//
+//			mod_mc_velocities.push_back(main_part.get_myvelocity().x);
+//			mod_mc_velocities.push_back(main_part.get_myvelocity().y); // atom velocities
+//			mod_mc_velocities.push_back(main_part.get_myvelocity().z);
+//
+//			mod_mc_epot.push_back(main_part.get_myepot());            // atom epot
+//
+//		}// loop over particle
+//
+//		// not required here -- declared in api using clear_all
+//		// delete all particles in cell
+//		loc_obj.get_cell(i).clear_all_particles();
+//
+//	}// loop over cells
+////
+//	// delete all cells
+//	loc_obj.clear_all_cells();
 
     // clear created objects
 

@@ -291,9 +291,9 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, ivec3d global_cell_
 
      long total_cells = loc_obj.get_cell_list_size();
 
-	 for(long i=0;i<tatoms_cpu;i++){
+     particle atom;
 
-		 particle atom;
+	 for(long i=0;i<tatoms_cpu;i++){
 
 		 // assigning particle attributes
 		 atom.set_mynumber(atomnumber.at(i));
@@ -2324,6 +2324,10 @@ void do_local_mdrun(string bin_name,string param_name,int prank){
     system(cmd4_ptr); // remove param clone
 }
 
+
+
+//==================================================================================================================
+
 cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* data_list,
 			int prank,int test_rank,vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name,celltype** catalog){
 
@@ -2347,7 +2351,6 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
        cout << "****************************************************" << endl;
 
 	}
-
 
 
     //celltype my_update_part;
@@ -2468,7 +2471,7 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
     cout <<"==============================================" << endl;
 
 
-
+    // cell containing deleted part list: old_sphere, neighbors 1-7 and my sphere portion
     // assigning nb_cells from catalog
     loc_old_sphere  = **(catalog+0);
     loc_nb0         = **(catalog+1);
@@ -2532,7 +2535,12 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
     int check_type=0;     // type of acceptance condition
 
     // new argument catalog
-    accep_tag = acceptance_check(check_type,**(catalog+0),sphere_new);
+
+    //if(prank == test_rank){
+
+    accep_tag = acceptance_check(check_type,&loc_old_sphere,&sphere_new);
+
+    //}
 
     if(prank == test_rank){
          cout <<"=====================================" << endl;
@@ -2611,12 +2619,15 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
     	int x = gcoord.x; int y = gcoord.y; int z = gcoord.z; // [ x y z] -- this process coordinate from MPI Cartesian system
 
 
+    	// process rank list from whom I requested sphere portion
     	for(int ind=0;ind<4;ind++){
-    		rec_nb_rank[ind] = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+    		//rec_nb_rank[ind] = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+    		rec_nb_rank[ind] = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
     	}
 
     	for(int ind=0;ind<3;ind++){
-    		rec_nb_rank[4+ind] = get_cpu_rank(x+x_recv_next[ind],y+y_recv_next[ind],z+z_recv_next[ind],comm_name);
+    		//rec_nb_rank[4+ind] = get_cpu_rank(x+x_recv_next[ind],y+y_recv_next[ind],z+z_recv_next[ind],comm_name);
+    		rec_nb_rank[4+ind] = get_cpu_rank(x+x_send_next[ind],y+y_send_next[ind],z+z_send_next[ind],comm_name);
     	}
 
     	if(prank == test_rank){
@@ -2664,9 +2675,9 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
 
         // Update if configuration get accepted
 
-        //accep_tag = 0; (for testing)
+        //accep_tag = 0; //(for testing)
 
-        if(accep_tag){
+        if(accep_tag !=0){
 
         	   // delete all my old particles in my CPU
 
@@ -2697,7 +2708,6 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
                 	if(type_check < real_types){ // ignore spherical wall particles (CHECK: reconsider this!!)
 
                 	    buf_ind = 0;                      // initialize for each buffer step
-
 
                 	    // attributes assignments
                 	    temp_id     = (double) fbuffer_id.at(i);
@@ -2863,47 +2873,235 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
 
         //-----------------------------------------------------------------------------------------
         //                                     Phase-3
-        //                      Communicating with neighbors on acceptance decision and no of particles
+        //                      Communicating with neighbors regarding updated no of particles
         //-----------------------------------------------------------------------------------------
 
         // decision variables for all neighbors from whom I got sphere portions (to send)
-        // [0]-acceptance_flag; [1]-no of particles;
-        long nb_dec_0[2]={0,0}, nb_dec_1[2]={0,0}, nb_dec_2[2]={0,0}, nb_dec_3[2]={0,0}, nb_dec_4[2]={0,0}, nb_dec_5[2]={0,0}, nb_dec_6[2]={0,0};
+        // [0]-no of particles
+        long nb_dec_0=0, nb_dec_1=0, nb_dec_2=0, nb_dec_3=0, nb_dec_4=0, nb_dec_5=0, nb_dec_6=0;
 
-        // decision variables from all neighbors to whom I send sphere portions (to receive)
-//        long ** rec_dec_0;
-//        rec_dec_0 = new long* [2];
-
-
-        // assigning decision variables
-        nb_dec_0[0] = accep_tag; nb_dec_0[1] = *to_send_list[0]*0.1;
-        nb_dec_1[0] = accep_tag; nb_dec_1[1] = *to_send_list[1]*0.1;
-        nb_dec_2[0] = accep_tag; nb_dec_2[1] = *to_send_list[2]*0.1;
-        nb_dec_3[0] = accep_tag; nb_dec_3[1] = *to_send_list[3]*0.1;
-        nb_dec_4[0] = accep_tag; nb_dec_4[1] = *to_send_list[4]*0.1;
-        nb_dec_5[0] = accep_tag; nb_dec_5[1] = *to_send_list[5]*0.1;
-        nb_dec_6[0] = accep_tag; nb_dec_6[1] = *to_send_list[6]*0.1;
-
-
-        long** nb_decision;
+        long ** nb_decision;
         nb_decision = new long* [7];
 
-        nb_decision[0] = nb_dec_0;
-        nb_decision[1] = nb_dec_1;
-        nb_decision[2] = nb_dec_2;
-        nb_decision[3] = nb_dec_3;
-        nb_decision[4] = nb_dec_4;
-        nb_decision[5] = nb_dec_5;
-        nb_decision[6] = nb_dec_6;
+        nb_dec_0 = *to_send_list[0];
+        nb_dec_1 = *to_send_list[1];
+        nb_dec_2 = *to_send_list[2];
+        nb_dec_3 = *to_send_list[3];
+        nb_dec_4 = *to_send_list[4];
+        nb_dec_5 = *to_send_list[5];
+        nb_dec_6 = *to_send_list[6];
+
+        nb_decision[0] = &nb_dec_0;
+        nb_decision[1] = &nb_dec_1;
+        nb_decision[2] = &nb_dec_2;
+        nb_decision[3] = &nb_dec_3;
+        nb_decision[4] = &nb_dec_4;
+        nb_decision[5] = &nb_dec_5;
+        nb_decision[6] = &nb_dec_6;
+
+
+        // to be tested and included
+
+//        // decision variables for all neighbors from whom I got sphere portions (to send)
+//        // [0]-no of particles
+//        long rec_dec_0=0, rec_dec_1=0, rec_dec_2=0, rec_dec_3=0, rec_dec_4=0, rec_dec_5=0, rec_dec_6=0;
+//
+//        long ** rec_decision;
+//        rec_decision = new long* [7];
+//
+//        rec_decision[0] = &rec_dec_0;
+//        rec_decision[1] = &rec_dec_1;
+//        rec_decision[2] = &rec_dec_2;
+//        rec_decision[3] = &rec_dec_3;
+//        rec_decision[4] = &rec_dec_4;
+//        rec_decision[5] = &rec_dec_5;
+//        rec_decision[6] = &rec_dec_6;
+//
+//        int send_id,rec_id;
+//
+//        //-------------------     Communication-1 ----------------------------------------------
+//        // sending updated no of particles if any to my neighbors from whom I got sphere portions
+//        //---------------------------------------------------------------------------------------
+//
+//    	for (int ind=0;ind<4;ind++){
+//
+//    	     if (z%2==0){ // if z is even
+//
+//    	       send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
+//    	       MPI_Send(nb_decision[ind],1,MPI_LONG,send_id,10,comm_name);
+//
+//    	       rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+//    	       MPI_Recv(rec_decision[ind],1,MPI_LONG,rec_id,11,comm_name,&stat);
+//
+//    	     }
+//    	     else{       // if z is odd
+//
+//    	       rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+//    	       MPI_Recv(rec_decision[ind],1,MPI_LONG,rec_id,10,comm_name,&stat);
+//
+//    	       send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
+//    	       MPI_Send(nb_decision[ind],1,MPI_LONG,send_id,11,comm_name);
+//
+//    	     }
+//    	}
+//
+//    	// Next phase even-even or odd-odd communications
+//
+//    	if(prank == test_rank){
+//    		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
+//    		cout << "   MPI Communication in X direction     " << endl;
+//    		cout << "      "<< endl;
+//    	}
+//
+//    	// x direction communication
+//    	if (x%2 == 0){    // if x is even
+//    	         // right & left comm
+//
+//    		   send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
+//    		   MPI_Send(nb_decision[4],1,MPI_LONG,send_id,12,comm_name);
+//
+//    	       rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
+//    	       MPI_Recv(rec_decision[4],1,MPI_LONG,rec_id,13,comm_name,&stat);
+//
+//    	         // top-right & bottom-left comm
+//    	       send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
+//    	       MPI_Send(nb_decision[5],1,MPI_LONG,send_id,14,comm_name);
+//
+//    	       rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
+//    	       MPI_Recv(rec_decision[5],1,MPI_LONG,rec_id,15,comm_name,&stat);
+//
+//    	}
+//    	else{ // if x is odd
+//
+//    		   rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
+//    		   // right & left comm
+//    		   MPI_Recv(rec_decision[4],1,MPI_LONG,rec_id,12,comm_name,&stat);
+//
+//    	       send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
+//    	       MPI_Send(nb_decision[4],1,MPI_LONG,send_id,13,comm_name);
+//
+//    	       rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
+//    	       // top-right & bottom-left comm
+//    	       MPI_Recv(rec_decision[5],1,MPI_LONG,rec_id,14,comm_name,&stat);
+//
+//    	       send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
+//    	       MPI_Send(nb_decision[5],1,MPI_LONG,send_id,15,comm_name);
+//
+//    	}
+//
+//    	if(prank == test_rank){
+//    		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
+//    		cout << "   MPI Communication in Y direction     " << endl;
+//    		cout << "      "<< endl;
+//    	}
+//
+//    	// y direction communication
+//
+//    	if (y%2 == 0){      // if y is even
+//
+//    		   send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
+//    		   // top & bottom comm
+//    		   MPI_Send(nb_decision[6],1,MPI_LONG,send_id,16,comm_name);
+//
+//    	       rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
+//    	       MPI_Recv(rec_decision[6],1,MPI_LONG,rec_id,17,comm_name,&stat);
+//
+//    	}
+//    	else{              // if y is odd
+//
+//    		   rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
+//    		   MPI_Recv(rec_decision[6],1,MPI_LONG,rec_id,16,comm_name,&stat);
+//
+//    	       send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
+//    	       MPI_Send(nb_decision[6],1,MPI_LONG,send_id,17,comm_name);
+//    	}
+//
+//    	//**************************************************************************************************
+//
+//        // buffer allocation part
+//
+//    	// N1 N2 N4 N6 N3 N5 N7
+//    	double *update_nb_0, *update_nb_1, *update_nb_2, *update_nb_3, *update_nb_4, *update_nb_5, *update_nb_6; // to be allocated and send
+//
+//    	// allocate memory (to receive from neighbors)
+//
+//    	update_nb_0 = new double [*(rec_decision+0)]; update_nb_1= new double [*(rec_decision+1)];
+//    	update_nb_2 = new double [*(rec_decision+2)]; update_nb_3 = new double [*(rec_decision+3)];
+//    	update_nb_4 = new double [*(rec_decision+4)]; update_nb_5 = new double [*(rec_decision+5)];
+//    	update_nb_6 = new double [*(rec_decision+6)];
+//
+//    	double* rec_update_buf[7] = {update_nb_0,update_nb_1,update_nb_2,update_nb_3,update_nb_4,update_nb_5,update_nb_6};
+//
+//    	// -------------------------   Communication - 2 ------------------------------------------
+//    	//----------  sending the updated buffer to my neighbors from whom I got the sphere portion
+//    	//-----------------------------------------------------------------------------------------
+//
+//    	// synchronize communication
+//    	MPI_Barrier(comm_name);
+//
+//        // z direction
+//
+//    	for (int i=0;i<4;i++){
+//            if (z%2==0){
+//              // front comm
+//
+//              MPI_Send(nb_buffer[i],(*to_send_list[i]),MPI_DOUBLE,get_cpu_rank(x+x_send_phase[i],y+y_send_phase[i],z+z_send_phase[i],comm_name),18,comm_name);
+//              MPI_Recv(rec_update_buf[i],(*rec_decision[i]),MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[i],y+y_recv_phase[i],z+z_recv_phase[i],comm_name),19,comm_name,&stat);
+//            }
+//            else{
+//
+//              MPI_Recv(rec_update_buf[i],(*rec_decision[i]),MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[i],y+y_recv_phase[i],z+z_recv_phase[i],comm_name),18,comm_name,&stat);
+//              MPI_Send(nb_buffer[i],(*to_send_list[i]),MPI_DOUBLE,get_cpu_rank(x+x_send_phase[i],y+y_send_phase[i],z+z_send_phase[i],comm_name),19,comm_name);
+//            }
+//        } // loop  over neighbors (N1 N2 N4 N6)
+//
+//        // Next phase even-even or odd-odd communications
+//
+//        // x direction communication
+//        if (x%2 == 0){
+//
+//                // right & left comm
+//              MPI_Send(nb_buffer[4],(*to_send_list[4]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name),20,comm_name);
+//              MPI_Recv(rec_update_buf[4],(*rec_decision[4]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name),21,comm_name,&stat);
+//
+//              // top-right & bottom-left comm
+//              MPI_Send(nb_buffer[5],(*to_send_list[5]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name),22,comm_name);
+//              MPI_Recv(rec_update_buf[5],(*rec_decision[5]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name),23,comm_name,&stat);
+//        }
+//        else{
+//
+//              MPI_Recv(rec_update_buf[4],(*rec_decision[4]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name),20,comm_name,&stat);
+//              MPI_Send(nb_buffer[4],(*to_send_list[4]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name),21,comm_name);
+//
+//              // top-right & bottom-left comm
+//              MPI_Recv(rec_update_buf[5],(*rec_decision[5]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name),22,comm_name,&stat);
+//              MPI_Send(nb_buffer[5],(*to_send_list[5]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name),23,comm_name);
+//        }
+//
+//        // y direction communication
+//        if (y%2 == 0){
+//        	  // top & bottom comm
+//              MPI_Send(nb_buffer[6],(*to_send_list[6]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name),24,comm_name);
+//              MPI_Recv(rec_update_buf[6],(*rec_decision[6]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),25,comm_name,&stat);
+//        }
+//        else{
+//              MPI_Recv(rec_update_buf[6],(*rec_decision[6]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),24,comm_name,&stat);
+//              MPI_Send(nb_buffer[6],(*to_send_list[6]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name),25,comm_name);
+//        }
+//
+//
+//    	// Delete buffer
+//    	delete[] update_nb_0;  delete[] update_nb_1; delete[] update_nb_2; delete[] update_nb_3;
+//    	delete[] update_nb_4;  delete[] update_nb_5; delete[] update_nb_6;
+
+
+    	// ---------------  End of untested code part -----------------------
 
 
 
-
-        cout << "#####################################################" << endl;
-        cout << " Another assignment check : " <<endl;
-        cout << " *(*(nb_decision+0)+0) :" << *(*(nb_decision+0)+0) << endl;
-        cout << " *(*(nb_decision+0)+1) :" << *(*(nb_decision+0)+1) << endl;
-        cout << "#####################################################" << endl;
+        // DELETE BUFFER MEMORY ACCORDINGLY
+        delete[] nb_0; delete[] nb_1;delete[] nb_2; delete[] nb_3;
+        delete[] nb_4;delete[] nb_5;delete[] nb_6;
 
         read_block = bobj;
         return read_block;
@@ -2911,13 +3109,16 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
 
 } // End of read_update config
 
-//==================================================================================================================
 
-int acceptance_check(int type,celltype old_sphere,celltype new_sphere){
+
+int acceptance_check(int type,celltype* glob_old_sphere,celltype* glob_new_sphere){
 
 	int flag=0,old_type,new_type;
 	double epot_old =0.0,epot_new =0.0, avg_epot_old =0.0, avg_epot_new = 0.0;
     long old_count=0, new_count=0;
+
+    celltype old_sphere = *glob_old_sphere;
+    celltype new_sphere = *glob_new_sphere;
 
 	// Energy computation
     if(type == 0){
@@ -2935,6 +3136,9 @@ int acceptance_check(int type,celltype old_sphere,celltype new_sphere){
                   // start from here
     			  if( old_type == 0 || old_type == 1 ){
     				  epot_old += old_sphere.get_particle(i).get_myepot();
+    				  //cout << " check here epot :" << epot_old << endl;
+    				  //cout << "old_sphere.get_particle(i).get_myepot()"<< old_sphere.get_particle(i).get_myepot()<< endl;
+
                       old_count++;
     			  }
 

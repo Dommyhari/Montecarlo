@@ -25,6 +25,13 @@ vector<double> mc_positions;     //  vector container for atom positions
 vector<double> mc_velocities;    //  vector container for atom velocities
 vector<double> mc_epot;          //  vector container for atom potential energy
 
+vector<int>      mod_mc_atomtypes;      //  updated vector container for atom types
+vector<long>     mod_mc_atomnumber;     //  updated vector container for atom number
+vector<double>   mod_mc_atommass;      //   updated vector container for atom mass
+vector<double>   mod_mc_positions;     //   updated vector container for atom positions
+vector<double>   mod_mc_velocities;    //   updated vector container for atom velocities
+vector<double>   mod_mc_epot;          //   updated vector container for atom potential energy
+
 // ------------------------------------------------------------------------
 // list of particle id exported for sphere construction for each neighbor
 //-------------------------------------------------------------------------

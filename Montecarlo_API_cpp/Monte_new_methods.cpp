@@ -168,21 +168,16 @@ ivec3d get_particle_glob_coordinate(double* pos,vec3d mc_cell_phy_dim){
 }
 
 // Tested
-cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d gcoord,ivec3d cpu_cell_dim, int prank){
-
+void make_cells(cellblock** loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d gcoord,ivec3d cpu_cell_dim, int prank){
     //    method for creating cell objects and fill in cellblock container
 	//    should assign cell boundary and ids correctly from the field
 
 	int cell_no     = 0;
 	ivec3d cell_total;
 
-	cellblock ret_obj;
-
 	int line_counter=0;
 
 	//  (could be hardcoded for Moving window approach as nxn )
-
-	//int ncells_tot    = loc_obj.get_ncells();
 
 	cell_total = calc_cpu_cell_division(cpu_box_diag,cell_dim);
 
@@ -196,6 +191,8 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
     int cells_stack=0;
     int cell_counter = 0;
+
+    celltype cell_obj;
 
     //*****************************************************************
     // create cell objects and fill into cell block container eventually
@@ -211,11 +208,7 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
 			for(int stack_no=0; stack_no<stack_total; stack_no++){
 
-				  celltype cell_obj;
-
                   // cell id computation
-        		  //cell_no = cell_counter + ( ncells_tot * prank ); // cell id computation
-
 				  cell_no = cell_counter; // cell id computation
 
         		  // numbering sequence: x--> y --> z
@@ -235,7 +228,9 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
        		      cell_obj.set_loc_coord(cell_lcoord);  // setting local cell coordinate
 
-       		      loc_obj.add_cell(cell_obj); // adding cell into cel_block
+       		      (**(loc_obj)).add_cell(cell_obj); // adding cell into cel_block
+
+       		      (**(loc_obj)).set_cell(cell_obj,cell_no);
 
        		      cell_counter++; //  incrementing cell counter
 
@@ -245,32 +240,12 @@ cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d
 
 	}//stack loop
 
-//    if(prank != 10) {
-//      cout << " ========================================================================" << endl;
-//      cout << " my process id :  " << prank << endl;
-//      cout << " CPU coordinate  : " << gcoord.x <<" " << gcoord.y <<" "<<gcoord.z <<" "<< endl;
-//      //cout << " Cell allocation check :  no of cells  :  " <<  loc_obj.get_cell_list_size() << endl;
-//      //cout << " cell ID :" << loc_obj.get_cell(cell_no).get_cell_id();
-//      //cout << "   cell global coordinate        "<< loc_obj.get_cell(cell_no).get_cell_glob_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().y
-//      //		  <<" "<<loc_obj.get_cell(cell_no).get_cell_glob_coord().z<<endl;
-//      //cout << "   cell local coordinate        "<< loc_obj.get_cell(cell_no).get_cell_loc_coord().x<<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().y
-//      //		  <<" "<<loc_obj.get_cell(cell_no).get_cell_loc_coord().z<<endl;
-//      cout << " ========================================================================" << endl;
-//    }
-
-
-
-	ret_obj = loc_obj;
-
-	return ret_obj;
-
 } // make_cells
 
 
 // Tested
-cellblock make_particles(cellblock loc_obj, long tatoms_cpu, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
-		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank,int debug,vec3d cell_dim){
-
+void make_particles(cellblock** loc_obj, long tatoms_cpu, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
+			vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank,int debug,vec3d cell_dim){
 
      // method for creating particle objects and fill in cell container
 
@@ -286,12 +261,13 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, ivec3d global_cell_
 
      int n_counter = 0;
      int l_counter = 0;
-
      int cell_index = 0;
 
-     long total_cells = loc_obj.get_cell_list_size();
-
+     ivec3d cpu_fact;
+     ivec3d cell_loc_coord;
      particle atom;
+
+     long total_cells = (**(loc_obj)).get_cell_list_size();
 
 	 for(long i=0;i<tatoms_cpu;i++){
 
@@ -307,92 +283,38 @@ cellblock make_particles(cellblock loc_obj, long tatoms_cpu, ivec3d global_cell_
  		 inst_pos[0] = positions.at((i*3)+0); inst_pos[1] = positions.at((i*3)+1); inst_pos[2] = positions.at((i*3)+2);
 
  		 // counting particles
-
- 		 // include later (March) (with in scope of Montecarlo_new_api.cpp)
-
+ 		 // include later (March) (with in scope of Montecarlo_new_api.cpp) -- SEMIGRAND CANONICAL EXTENTION
 // 		 if((mc_atomtypes.at(i)%mc_real_types) == 0) mc_real_cpu++;   // add real Fe particle
 // 		 if((mc_atomtypes.at(i)%mc_real_types) == 1) mc_carb_cpu++;   // add real C particle
 // 		 if((mc_atomtypes.at(i)%mc_real_types) == 2) mc_phold_cpu++;  // add placeholder particle
 
-
-         /*
- 		 if (i==0){
- 		      cout << "===================================================================================" << endl;
- 	          cout << "         Inside make_particles  check while reading and assigning              " << endl;
- 		      cout << " particle 0 -- id   :" << atom.get_mynumber() << endl;
- 	          cout << " particle 0 -- type :" << atom.get_mytype() << endl;
- 	          cout << " particle 0 -- mass :" << atom.get_mymass() << endl;
- 	          cout << " particle 0 -- pos_x :" << atom.get_myposition().x << endl;
- 	          cout << " particle 0 -- pos_y :" << atom.get_myposition().y << endl;
- 	          cout << " particle 0 -- pos_z :" << atom.get_myposition().z << endl;
- 	          //cout << " particle 0 -- epot  :" << atom.get_myepot() << endl;
- 	          cout << "===================================================================================" << endl;
- 		 }
- 		 */
-
-
  		 cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim); // New try with my method
 
- 		 // decrement operations
-// 		 cell_glob_coord.x = cell_glob_coord.x-1; cell_glob_coord.y = cell_glob_coord.y-1; cell_glob_coord.z = cell_glob_coord.z-1;
-
- 		 //cell_glob_coord = cell_coordinate(inst_pos,tbox_dim,global_cell_dim); // Earlier implementation
-
- 		 ivec3d cpu_fact = loc_cpu_gcoord;
+ 		 cpu_fact = loc_cpu_gcoord;
 
  		 // get cell local coordinate
- 		 ivec3d cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact,cpu_cell_dim);
+ 		 cell_loc_coord = get_cell_loc_coord(cell_glob_coord,cpu_fact,cpu_cell_dim);
 
  		 // to get memory index of cell in cell list
- 		 //cell_index = cell_loc_coord.x + (cell_loc_coord.y * cpu_cell_dim.x) + (cell_loc_coord.z * cpu_cell_dim.y * cpu_cell_dim.x);
-
-
- 		 cell_index = loc_obj.cell_with_lcoord(cell_loc_coord,total_cells).get_cell_id(); // expensive!!!!
+ 		 cell_index = (**(loc_obj)).cell_with_lcoord(cell_loc_coord,total_cells).get_cell_id(); // expensive!!!!
 
       	 // just for testing add all particles to cell 1
 
- 		 celltype cell0 = loc_obj.get_cell(cell_index);
+ 		 celltype cell0 = (**(loc_obj)).get_cell(cell_index);
 
  		 cell0.add_particle(atom);
 
-         loc_obj.set_cell(cell0,cell_index);  // update cell object with included particle
-
-//         if (debug == 1){
-//
-//        	   if((prank == 6) &&  (cell_index==63) && (l_counter == 0)){
-//
-//        		         cout << "  Super check: Inside make particles " << endl;
-//                         cout << "  cell index  : " << cell_index << endl;
-//                         cout << "  cell size :  " <<  loc_obj.get_cell(cell_index).get_nparticles() << endl;
-//                         cout << "  my no :" << loc_obj.get_cell(cell_index).get_particle(0).get_mynumber() << endl;
-//    	                 cout << "  my type :" << loc_obj.get_cell(cell_index).get_particle(0).get_mytype() << endl;
-//        	             cout << "  my mass :" << loc_obj.get_cell(cell_index).get_particle(0).get_mymass() << endl;
-//        	             cout << "  my pos:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().x << endl;
-//        	             cout << "  my pos:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().y << endl;
-//        	             cout << "  my pos:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().z << endl;
-//    	                 cout << "  epot      "<< loc_obj.get_cell(cell_index).get_particle(0).get_myepot() << endl;
-//
-//    	                 l_counter++;
-//           }
-//         }
+ 		 (**(loc_obj)).set_cell(cell0,cell_index);  // update cell object with included particle
 
  		 }// end of for loop
-
-	     // returning updated cellblock
-	     ret_obj = loc_obj;
-
-	     return ret_obj;
 
 } //make particles
 
 // Tested
-cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  restriction, int prank,int debug){
+void create_maxwell_velocities(cellblock** loc_obj,double temp, ivec3d*  restriction, int prank,int debug){
 
-	 //     this code fragment/logic is inspired and inherited from IMD- imd_maxwell.c
+	//     this code fragment/logic is inspired and inherited from IMD- imd_maxwell.c
 	 //     the impulse computation is re-implemented in terms of velocity .(velocity = impulse/mass)
-
-	  cellblock ret_obj;
-
 	  //   create and fill initial velocities for particles
 
       double vx,vy,vz;                      // velocity holders
@@ -403,23 +325,20 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
       int   dof_x,dof_y,dof_z;               // degrees of freedom holders
       long  tot_dof_x,tot_dof_y,tot_dof_z ;
 
-      long cell_count = loc_obj.get_cell_list_size(); // no of cells in cellblock
+      long cell_count = (**(loc_obj)).get_cell_list_size(); // no of cells in cellblock
       long particles_count = 0;
       int mytype=0;
       int cell_index=0, l_counter=0;
+      celltype cobj;
+      particle atom;
 
       for(long i=0; i<cell_count; i++){ // loop over all cells
 
-    	  celltype cobj;
-    	  cobj = loc_obj.get_cell(i);
+    	  cobj = (**(loc_obj)).get_cell(i);
 
     	  particles_count = cobj.get_nparticles();
 
-    	  //particles_count = loc_obj.get_cell(i).get_nparticles();
-
     	  for(long j=0; j<particles_count; j++){ // loop over all particles
-
-        	  particle atom;
 
         	  atom = cobj.get_particle(j);
         	  mytype = atom.get_mytype();
@@ -454,7 +373,7 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
     	  } // loop particles -1
 
     	  //update cell object
-    	  loc_obj.set_cell(cobj,i);
+    	  (**(loc_obj)).set_cell(cobj,i);
 
       } // loop cells-1
 
@@ -472,17 +391,12 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
 
 	  for(long i=0; i<cell_count; i++){ // loop over all cells
 
-    	  celltype cobj;
-    	  cobj = loc_obj.get_cell(i);
+    	  cobj = (**(loc_obj)).get_cell(i);
     	  particles_count = cobj.get_nparticles();
-
-    	  //particles_count = loc_obj.get_cell(cell_count).get_nparticles();
-
 
 		  for(long j=0; j<particles_count; j++){ // loop over all particles
 
-        	  particle atom;
-        	  int mytype;
+			  int mytype;
         	  atom = cobj.get_particle(j);
         	  mytype = atom.get_mytype();
 
@@ -495,7 +409,6 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
         	  new_vx = atom.get_myvelocity().x - ( (sum_x /atom.get_mymass()) * dof_x ) ;
         	  new_vy = atom.get_myvelocity().y - ( (sum_y /atom.get_mymass()) * dof_y ) ;
         	  new_vz = atom.get_myvelocity().z - ( (sum_z /atom.get_mymass()) * dof_z ) ;
-
 
 //        	  new_vx = ((atom.get_myvelocity().x - sum_x )/atom.get_mymass()) * dof_x;
 //        	  new_vy = ((atom.get_myvelocity().y - sum_y )/atom.get_mymass()) * dof_y;
@@ -510,7 +423,7 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
 		  } // loop particles -2
 
     	  //update cell object
-    	  loc_obj.set_cell(cobj,i);
+		  (**(loc_obj)).set_cell(cobj,i);
 
           cell_index = i;
 
@@ -518,31 +431,25 @@ cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  rest
 
          	  cout << "  Super check: create Maxwell velocities " << endl;
               cout << "  cell index  : " << cell_index << endl;
-              cout << "  cell size :  " <<  loc_obj.get_cell(cell_index).get_nparticles() << endl;
-              cout << "  my no :" << loc_obj.get_cell(cell_index).get_particle(0).get_mynumber() << endl;
-     	      cout << "  my type :" << loc_obj.get_cell(cell_index).get_particle(0).get_mytype() << endl;
-         	  cout << "  my mass :" << loc_obj.get_cell(cell_index).get_particle(0).get_mymass() << endl;
-         	  cout << "  my pos:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().x << endl;
-         	  cout << "  my pos:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().y << endl;
-         	  cout << "  my pos:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myposition().z << endl;
-              cout << "  my vel:x " << loc_obj.get_cell(cell_index).get_particle(0).get_myvelocity().x << endl;
-              cout << "  my vel:y " << loc_obj.get_cell(cell_index).get_particle(0).get_myvelocity().y << endl;
-              cout << "  my vel:z " << loc_obj.get_cell(cell_index).get_particle(0).get_myvelocity().z << endl;
-         	  cout << "  epot      "<< loc_obj.get_cell(cell_index).get_particle(0).get_myepot() << endl;
+              cout << "  cell size :  " <<  (**(loc_obj)).get_cell(cell_index).get_nparticles() << endl;
+              cout << "  my no :" << (**(loc_obj)).get_cell(cell_index).get_particle(0).get_mynumber() << endl;
+     	      cout << "  my type :" << (**(loc_obj)).get_cell(cell_index).get_particle(0).get_mytype() << endl;
+         	  cout << "  my mass :" << (**(loc_obj)).get_cell(cell_index).get_particle(0).get_mymass() << endl;
+         	  cout << "  my pos:x " << (**(loc_obj)).get_cell(cell_index).get_particle(0).get_myposition().x << endl;
+         	  cout << "  my pos:y " << (**(loc_obj)).get_cell(cell_index).get_particle(0).get_myposition().y << endl;
+         	  cout << "  my pos:z " << (**(loc_obj)).get_cell(cell_index).get_particle(0).get_myposition().z << endl;
+              cout << "  my vel:x " << (**(loc_obj)).get_cell(cell_index).get_particle(0).get_myvelocity().x << endl;
+              cout << "  my vel:y " << (**(loc_obj)).get_cell(cell_index).get_particle(0).get_myvelocity().y << endl;
+              cout << "  my vel:z " << (**(loc_obj)).get_cell(cell_index).get_particle(0).get_myvelocity().z << endl;
+         	  cout << "  epot      "<< (**(loc_obj)).get_cell(cell_index).get_particle(0).get_myepot() << endl;
 
      	      l_counter++;
           }
 
 	  } // loop cells -2
 
-
-	  //updating block object
-	  ret_obj = loc_obj;
-
 	  // check msg
 	  cout<<" initial velocities are computed for cpu id:"<< prank <<endl;
-
-	  return ret_obj;
 
 }
 // Tested
@@ -572,7 +479,7 @@ double get_gaussian(double sigma){
 }
 
 // Tested
-particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
+particle sample_zone(cellblock** bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 
 	celltype cobj;             // cell object
 
@@ -584,7 +491,7 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 	// local cell coordinates zone
     ivec3d test;
     int count=0,rand_cell;
-    long ncells = bobj.get_cell_list_size();
+    long ncells = (**(bobj)).get_cell_list_size();
 
 
     // defining zone limits
@@ -617,7 +524,7 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
     		for(int k=zone_limit[win_id].zmin;k<=zone_limit[win_id].zmax;k++){
 
     			test.x = i; test.y = j; test.z = k;
-    			sample_cells[count] = bobj.cell_with_lcoord(test,ncells);
+    			sample_cells[count] = (**(bobj)).cell_with_lcoord(test,ncells);
 
                 count++;
     		}
@@ -625,7 +532,7 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
     }
 
 
-//    if(prank == 6){
+//    if(prank == 0){
 //    	cout << " %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << endl;
 //    	cout << "---                Inside sample zone method                      ---------" << endl;
 //    	cout << " My process CPU  : " << prank << endl;
@@ -658,20 +565,15 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 //    	}
 //    	cout << " %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << endl;
 //
-//    	cout << " CPU Cell local coordinates assignments check  " << endl;
 //    	cout << " =====================================================" << endl;
 //
-//
 //    }
-
 
     // choose one cell in random (belong to sample window)
 
     srand(prank);
 	rand_cell = rand()%sam_cell_counter;
 	cobj = sample_cells[rand_cell];
-
-
 
 	do{
 		//no of particles
@@ -680,9 +582,9 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 		rand_no=(long) rand()%n_particles;
 	}while(cobj.get_particle(rand_no).get_mytype() !=2);
 
-
 	atom = cobj.get_particle(rand_no);
 
+//	if(prank==5){
 //	cout << "************************************************************" << endl;
 //	cout << " Random generator check    "  << endl;
 //	cout << " my process rank : " << prank << endl;
@@ -694,17 +596,18 @@ particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank){
 //	cout << " Random particle position x :"  << atom.get_myposition().x << endl;
 //	cout << " Random particle position y :"  << atom.get_myposition().y << endl;
 //	cout << " Random particle position z :"  << atom.get_myposition().z << endl;
-//
+//	cout << " Random particle velocity x :"  << atom.get_myvelocity().x << endl;
+//	cout << " Random particle velocity y :"  << atom.get_myvelocity().y << endl;
+//	cout << " Random particle velocity z :"  << atom.get_myvelocity().z << endl;
 //    cout << "************************************************************" << endl;
+//	}
 
 	return atom;
 }
 
-//celltype construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat,
-//		int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim,celltype** catalog){
+void construct_sphere(particle pobj, cellblock** bobj, int win_id,int prank,MPI_Comm comm_name, MPI_Status stat,
+				int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim,celltype** catalog){
 
-cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat,
-			int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim,celltype** catalog){
 
 	//########################################################################################################################################################
 	//
@@ -713,7 +616,7 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	//                   Random particle is chosen from sample cell list defined by appropriate window position
 	//########################################################################################################################################################
 
-    cellblock block_obj;
+
 
 	// possible neighbor index as per window location
 
@@ -746,13 +649,13 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	// send neighbors (to whom I send)        ---- process communications (in z direction)
 	int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
 
-	// Receive neighbors (to whom I receive) ----- process communications (in z direction)
+	// Receive neighbors (from whom I receive) ----- process communications (in z direction)
 	int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
 
     // send neighbors (to whom I send) -----  process communications (in x/y direction)
 	int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
 
-	// Receive neighbors (to whom I send) -----  process communications (in x/y direction)
+	// Receive neighbors (from whom I receive) -----  process communications (in x/y direction)
 	int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
 
 	// variables to store the position of selected particle on my CPU and neighbor CPU's
@@ -760,7 +663,16 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
 	double my_pos[3], rec_pos_0[3],rec_pos_1[3],rec_pos_2[3],rec_pos_3[3],rec_pos_4[3],rec_pos_5[3],rec_pos_6[3];
 
-	double* rec_pos[7]={rec_pos_0,rec_pos_1,rec_pos_2,rec_pos_3,rec_pos_4,rec_pos_5,rec_pos_6}; // get and store positions from all seven neighbors
+//    celltype** ptr_list;
+//    ptr_list = new celltype* [9];
+
+	//double* rec_pos[7]={rec_pos_0,rec_pos_1,rec_pos_2,rec_pos_3,rec_pos_4,rec_pos_5,rec_pos_6}; // get and store positions from all seven neighbors
+
+	double** rec_pos; rec_pos = new double* [7];
+
+	rec_pos[0] = rec_pos_0; rec_pos[1] = rec_pos_1; rec_pos[2] = rec_pos_2; rec_pos[3] = rec_pos_3;
+	rec_pos[4] = rec_pos_4; rec_pos[5] = rec_pos_5; rec_pos[6] = rec_pos_6;
+
 
 	//  get chosen random particle position
 	my_pos[0]=pobj.get_myposition().x; my_pos[1]=pobj.get_myposition().y; my_pos[2]=pobj.get_myposition().z;
@@ -1027,8 +939,8 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 			cout << " nb_gcoord[ "<<i<<" ]  : "<< nb_gcoord[i][0] <<" "<< nb_gcoord[i][1] <<" "<< nb_gcoord[i][2] <<" "<<endl;
 		}
 		cout << " data_list[0]  : " << data_list[0] << endl;
-		cout << " no of cells in CPU  :   " << bobj.get_cell_list_size() << endl;
-		cout << " no of particles in one cell 0  :" << bobj.get_cell(0).get_nparticles()<<endl;
+		cout << " no of cells in CPU  :   " << (**(bobj+0)).get_cell_list_size() << endl;
+		cout << " no of particles in one cell 0  :" << (**(bobj+0)).get_cell(0).get_nparticles()<<endl;
 
 
 		cout <<"***********************************************************"<<endl;
@@ -1045,10 +957,10 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 //
 //########################################################################################################################################################
 
-	// cell_list  catalog
+	// cell_list  catalog description
 
 	// *(catalog+0) - &sphere cell
-	// --- list of neighbors to whom I send my particles for sphere construction
+	// --- list of neighbors to whom I send my particles for sphere construction (upon request I received)
 	// *(catalog+1) - &neighbor 1
 	// *(catalog+2) - &neighbor 2
 	// *(catalog+3) - &neighbor 3
@@ -1060,9 +972,9 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
 	// cell list contain set of particles exported for sphere construction
 	// 1-7 neighbors, my_CPU
-	celltype cat_nb_0,cat_nb_1,cat_nb_2,cat_nb_3,cat_nb_4,cat_nb_5,cat_nb_6,cat_my_list;
 
-	celltype catalog_list[8] = {cat_nb_0,cat_nb_1,cat_nb_2,cat_nb_3,cat_nb_4,cat_nb_5,cat_nb_6,cat_my_list};
+//	celltype cat_nb_0,cat_nb_1,cat_nb_2,cat_nb_3,cat_nb_4,cat_nb_5,cat_nb_6,cat_my_list;
+//	celltype catalog_list[8] = {cat_nb_0,cat_nb_1,cat_nb_2,cat_nb_3,cat_nb_4,cat_nb_5,cat_nb_6,cat_my_list};
 
     // defining zone limits
     int x_start=0,  x_mid = cpu_cell_dim.x/2,    x_end = cpu_cell_dim.x;   // zone limit parameters in x direction
@@ -1095,11 +1007,13 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
 	// boundary checks and flag assignments (ENSURE COORDINATES SHIFT IF REQUIRED)
 
-	//flag[0][2] = window_position[win_id].z + (nb_gcoord[0][2] cpu_max.z)
 	// NEED BETTER IMPLEMENTATION
 	// z check  with  N1 ( Neighbor -1)
 	if( (nb_gcoord[0][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[0][2] = -1;}
 	if( (nb_gcoord[0][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[0][2] = +1;}
+
+//	if( (nb_gcoord[0][2] == cpu_min.z) && (window_position[win_id].z==1) && (z==cpu_max.z)) { flag[0][2] = +1;}
+//	if( (nb_gcoord[0][2] == cpu_max.z) && (window_position[win_id].z==0) && (z==cpu_min.z)) { flag[0][2] = -1;}
 
 
 	// x-z check with N2 ( Neighbor -2)
@@ -1107,6 +1021,12 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	if( (nb_gcoord[1][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[1][0] = +1;}
 	if( (nb_gcoord[1][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[1][2] = -1;}
 	if( (nb_gcoord[1][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[1][2] = +1;}
+
+//	if( (nb_gcoord[1][0] == cpu_min.x) && (window_position[win_id].x==1) && (x==cpu_max.x)) { flag[1][0] = +1;}
+//	if( (nb_gcoord[1][0] == cpu_max.x) && (window_position[win_id].x==0) && (x==cpu_min.x)) { flag[1][0] = -1;}
+//	if( (nb_gcoord[1][2] == cpu_min.z) && (window_position[win_id].z==1) && (z==cpu_max.z)) { flag[1][2] = +1;}
+//	if( (nb_gcoord[1][2] == cpu_max.z) && (window_position[win_id].z==0) && (z==cpu_min.z)) { flag[1][2] = -1;}
+
 
 	// x-y-z check with N4 ( Neighbor -3)
 	if( (nb_gcoord[2][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[2][0] = -1;}
@@ -1116,15 +1036,33 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	if( (nb_gcoord[2][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[2][2] = -1;}
 	if( (nb_gcoord[2][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[2][2] = +1;}
 
+//	if( (nb_gcoord[2][0] == cpu_min.x) && (window_position[win_id].x==1) && (x==cpu_max.x)) { flag[2][0] = +1;}
+//	if( (nb_gcoord[2][0] == cpu_max.x) && (window_position[win_id].x==0) && (x==cpu_min.x)) { flag[2][0] = -1;}
+//	if( (nb_gcoord[2][1] == cpu_min.y) && (window_position[win_id].y==1) && (y==cpu_max.y)) { flag[2][1] = +1;}
+//	if( (nb_gcoord[2][1] == cpu_max.y) && (window_position[win_id].y==0) && (y==cpu_min.y)) { flag[2][1] = -1;}
+//	if( (nb_gcoord[2][2] == cpu_min.z) && (window_position[win_id].z==1) && (z==cpu_max.z)) { flag[2][2] = +1;}
+//	if( (nb_gcoord[2][2] == cpu_max.z) && (window_position[win_id].z==0) && (z==cpu_min.z)) { flag[2][2] = -1;}
+
+
+
 	// y-z check with N6 ( Neighbor -4)
 	if( (nb_gcoord[3][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[3][1] = -1;}
 	if( (nb_gcoord[3][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[3][1] = +1;}
 	if( (nb_gcoord[3][2] == cpu_min.z) && (window_position[win_id].z==0) ) { flag[3][2] = -1;}
 	if( (nb_gcoord[3][2] == cpu_max.z) && (window_position[win_id].z==1) ) { flag[3][2] = +1;}
 
+//	if( (nb_gcoord[3][1] == cpu_min.y) && (window_position[win_id].y==1) && (y==cpu_max.y)) { flag[3][1] = +1;}
+//	if( (nb_gcoord[3][1] == cpu_max.y) && (window_position[win_id].y==0) && (y==cpu_min.y)) { flag[3][1] = -1;}
+//	if( (nb_gcoord[3][2] == cpu_min.z) && (window_position[win_id].z==1) && (z==cpu_max.z)) { flag[3][2] = +1;}
+//	if( (nb_gcoord[3][2] == cpu_max.z) && (window_position[win_id].z==0) && (z==cpu_min.z)) { flag[3][2] = -1;}
+
+
 	// x check with N3  ( Neighbor -5)
 	if( (nb_gcoord[4][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[4][0] = -1;}
 	if( (nb_gcoord[4][0] == cpu_max.x) && (window_position[win_id].x==1) ) { flag[4][0] = +1;}
+
+//	if( (nb_gcoord[4][0] == cpu_min.x) && (window_position[win_id].x==1) && (x==cpu_max.x)) { flag[4][0] = +1;}
+//	if( (nb_gcoord[4][0] == cpu_max.x) && (window_position[win_id].x==0) && (x==cpu_min.x)) { flag[4][0] = -1;}
 
 	// x-y check with N5 ( Neighbor -6)
 	if( (nb_gcoord[5][0] == cpu_min.x) && (window_position[win_id].x==0) ) { flag[5][0] = -1;}
@@ -1132,9 +1070,18 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	if( (nb_gcoord[5][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[5][1] = -1;}
 	if( (nb_gcoord[5][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[5][1] = +1;}
 
+//	if( (nb_gcoord[5][0] == cpu_min.x) && (window_position[win_id].x==1) && (x==cpu_max.x)) { flag[5][0] = +1;}
+//	if( (nb_gcoord[5][0] == cpu_max.x) && (window_position[win_id].x==0) && (x==cpu_min.x)) { flag[5][0] = -1;}
+//	if( (nb_gcoord[5][1] == cpu_min.y) && (window_position[win_id].y==1) && (y==cpu_max.y)) { flag[5][1] = +1;}
+//	if( (nb_gcoord[5][1] == cpu_max.y) && (window_position[win_id].y==0) && (y==cpu_min.y)) { flag[5][1] = -1;}
+
 	// y check with N7 ( Neighbor -7)
 	if( (nb_gcoord[6][1] == cpu_min.y) && (window_position[win_id].y==0) ) { flag[6][1] = -1;}
 	if( (nb_gcoord[6][1] == cpu_max.y) && (window_position[win_id].y==1) ) { flag[6][1] = +1;}
+
+//	if( (nb_gcoord[6][1] == cpu_min.y) && (window_position[win_id].y==1) && (y==cpu_max.y)) { flag[6][1] = +1;}
+//	if( (nb_gcoord[6][1] == cpu_max.y) && (window_position[win_id].y==0) && (y==cpu_min.y)) { flag[6][1] = -1;}
+
 
 	// variables for neighbor cell ranges
 	int nb_xmin, nb_ymin, nb_zmin, nb_xmax, nb_ymax, nb_zmax, nb_x, nb_y, nb_z;
@@ -1157,8 +1104,10 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	nb_z = glob_c_dim.z - (window_position[win_id].z * glob_c_dim.z );
 
     // List of neighbor cells to be exported
+
 	vector<celltype> nb_cells;
-	long ncells = bobj.get_cell_list_size();
+
+	long ncells = (**(bobj)).get_cell_list_size();
 
 	// cell counters for neighbor communications
 	int count_1=0, count_2=0, count_3=0, count_4=0, count_5=0, count_6=0, count_7=0;
@@ -1173,8 +1122,8 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     for(int i=nb_xmin;i<=nb_xmax;i++){
     	for(int j=nb_ymin;j<=nb_ymax;j++){
     			test.x = i; test.y = j; test.z = nb_z;
-    			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
-    			tot_part_1 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+    			nb_cells.push_back((**(bobj)).cell_with_lcoord(test,ncells));
+    			tot_part_1 += (**(bobj)).cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
     			count_1++;
     	}
     }
@@ -1182,22 +1131,22 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     // Neighbor-2 (N2) ( x-z direction)
 	for(int j=nb_ymin;j<=nb_ymax;j++){
 			test.x = nb_x; test.y = j; test.z = nb_z;
-			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
-			tot_part_2 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+			nb_cells.push_back((**(bobj)).cell_with_lcoord(test,ncells));
+			tot_part_2 += (**(bobj)).cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
 			count_2++;
 	}
 
 	//Neighbor-3 (N4) (x-y-z direction)
 	test.x = nb_x; test.y = nb_y; test.z = nb_z;
-	nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
-	tot_part_3 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+	nb_cells.push_back((**(bobj)).cell_with_lcoord(test,ncells));
+	tot_part_3 += (**(bobj)).cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
 	count_3++;
 
 	//Neighbor-4 (N6) (y-z direction)
 	for(int i=nb_xmin;i<=nb_xmax;i++){
 			test.x = i; test.y = nb_y; test.z = nb_z;
-			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
-			tot_part_4 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+			nb_cells.push_back((**(bobj)).cell_with_lcoord(test,ncells));
+			tot_part_4 += (**(bobj)).cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
 			count_4++;
 	}
 
@@ -1205,8 +1154,8 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     for(int j=nb_ymin;j<=nb_ymax;j++){
     	for(int k=nb_zmin; k<=nb_zmax; k++){
     			test.x = nb_x; test.y = j; test.z = k;
-    			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
-    			tot_part_5 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+    			nb_cells.push_back((**(bobj)).cell_with_lcoord(test,ncells));
+    			tot_part_5 += (**(bobj)).cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
     			count_5++;
     	}
     }
@@ -1214,8 +1163,8 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	//    //Neighbor-6 (N5) (x-y direction)
 	for(int k=nb_zmin;k<=nb_zmax;k++){
 			test.x = nb_x; test.y = nb_y; test.z = k;
-			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
-			tot_part_6 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+			nb_cells.push_back((**(bobj)).cell_with_lcoord(test,ncells));
+			tot_part_6 += (**(bobj)).cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
 			count_6++;
 	}
 
@@ -1223,38 +1172,24 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     for(int i=nb_xmin;i<=nb_xmax;i++){
     	for(int k=nb_zmin; k<=nb_zmax; k++){
     			test.x = i; test.y = nb_y; test.z = k;
-    			nb_cells.push_back(bobj.cell_with_lcoord(test,ncells));
-    			tot_part_7 += bobj.cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
+    			nb_cells.push_back((**(bobj)).cell_with_lcoord(test,ncells));
+    			tot_part_7 += (**(bobj)).cell_with_lcoord(test,ncells).get_nparticles(); // add particle count
     			count_7++;
     	}
     }
 
-    int count_list[7]     = {count_1,count_2,count_3,count_4,count_5,count_6,count_7};                      // list of neighbor export cells counter
-    long* to_send_list[7] = {&tot_part_1,&tot_part_2,&tot_part_3,&tot_part_4,&tot_part_5,&tot_part_6,&tot_part_7}; // list of neighbor export particles counter
+    // list of neighbor export cells counter
+    int* count_list;
+    count_list = new int [7];
 
+    count_list[0] = count_1; count_list[1] = count_2; count_list[2] = count_3; count_list[3] = count_4; count_list[4] = count_5;
+    count_list[5] = count_6; count_list[6] = count_7;
 
-//    if (prank == test_rank){
-//       ivec3d nb_g_coord;
-//       cout << " **************************************************** " << endl;
-//       cout << " After allocation check : Neighbor cells  " << endl;
-//       cout << " nb_cells.size() " << nb_cells.size()<< endl;
-//
-//       cout << " neighbor cells counter check " << endl;
-//
-//       for(int i=0;i<7;i++){
-//    	   cout << " Neighbor "<< i<<" cell export count " << count_list[i] << "  particle export count   "<<tot_part_list[i]<< endl;
-//       }
-//
-//       cout << "  Neighbor cells coordinate check " << endl;
-//
-//       for(int i=0; i<nb_cells.size(); i++){
-//    	    nb_g_coord = nb_cells[i].get_cell_glob_coord();
-//    	    cout <<" cell count " << i <<" " << "glob coordinate "<< nb_g_coord.x <<" "<< nb_g_coord.y<<" "<< nb_g_coord.z << endl;
-//
-//       }
-//
-//       cout << " **************************************************** " << endl;
-//    }
+    // list of neighbor export particles counter
+    long** to_send_list; to_send_list = new long* [7];
+
+    to_send_list[0] = &tot_part_1; to_send_list[2] = &tot_part_3; to_send_list[4] = &tot_part_5; to_send_list[6] = &tot_part_7;
+    to_send_list[1] = &tot_part_2; to_send_list[3] = &tot_part_4; to_send_list[5] = &tot_part_6;
 
 	//***************************************************************************
 	//                  My received neighbor part - fill buffers for my neighbors
@@ -1274,8 +1209,12 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	nb_3 = new double [tot_part_4*10]; nb_4= new double [tot_part_5*10]; nb_5 = new double [tot_part_6*10];
 	nb_6 = new double [tot_part_7*10];
 
-	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
+	double** nb_buffer; nb_buffer = new double* [7];
 
+	nb_buffer[0] = nb_0; nb_buffer[1] = nb_1; nb_buffer[2] = nb_2;
+	nb_buffer[3] = nb_3; nb_buffer[4] = nb_4; nb_buffer[5] = nb_5; nb_buffer[6] = nb_6;
+
+	//double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
 
     double rsweep      = data_list[1];  // sphere radius
     double sphere_wall = data_list[2];  // wall thickness
@@ -1307,26 +1246,15 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	particle part_holder;
     ivec3d lcoord_holder;
     ivec3d gcoord_holder;
+
     vector<long> nb_part_id; // list of particles id exported to neighbor
     vector<long> my_part_id; // list of particles id for my sphere construction
-    long delete_id;
-
-//	if(prank == test_rank){
-//	    cout << "================================================" << endl;
-//		cout << " Received attributes check data_list " << endl;
-//	    cout << " rsweep   :" << rsweep << endl;
-//	    cout << " sphere_wall  :" <<sphere_wall << endl;
-//	    cout << " simbox_size.x :" << simbox_size.x << endl;
-//	    cout << " simbox_size.y :" << simbox_size.y << endl;
-//	    cout << " simbox_size.z :" << simbox_size.z << endl;
-//	    cout << " real_types  : "<<real_types << endl;
-//
-//		cout << "================================================" << endl;
-//	}
 
 	// sweep test part
 
-
+    celltype cell0;
+    int index_ref=0;
+    long delete_id=0;
 
 	for(int j=0; j<7;j++){ // loop over all neighbor CPU
 
@@ -1348,17 +1276,7 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
 	    	    part_count = nb_cells[k].get_nparticles(); //get total particles
 
-//	    	    if(prank == test_rank){
-//	    	    	cout << " Neigh ID : "<< j << " Export cell ID :  "<< k << "  particles count :   "<< part_count << endl;
-//	    	    	cout << " Export cell global coordinate : " << nb_cells[k].get_cell_glob_coord().x<<" "<<nb_cells[k].get_cell_glob_coord().y
-//	    	    			<<" "<<nb_cells[k].get_cell_glob_coord().y<< endl;
-//	    	    }
-
-
-                //gcoord_holder = nb_cells[k].get_cell_glob_coord();
-
                 lcoord_holder = nb_cells[k].get_cell_loc_coord();
-
 
 	    	    total_particles=0;
 
@@ -1425,11 +1343,11 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
 	                                    // add particle to catalog list
 
-	                                    part_holder = bobj.cell_with_lcoord(lcoord_holder,ncells).get_particle(val);
+	                                    part_holder = (**(bobj)).cell_with_lcoord(lcoord_holder,ncells).get_particle(val);
 
-	                                    //part_holder = nb_cells[k].get_particle(val);
+                                        //catalog_list[j].add_particle(part_holder);
+                                        (**(catalog+(1+j))).add_particle(part_holder);
 
-                                        catalog_list[j].add_particle(part_holder);
 
                                         // pushing particle index
                                         nb_part_id.push_back(temp_id);
@@ -1450,7 +1368,7 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	                                    total_particles++;
 
 	                                    // updated
-	                                    //part_count = bobj.cell_with_lcoord(lcoord_holder,ncells).get_nparticles(); //get total particles
+	                                    part_count = nb_cells[k].get_nparticles(); //get total particles
 		             	            }
 
 		                      }  // cut-off check
@@ -1467,28 +1385,22 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
 	    	         // deletion part of included particle
 
-  	        	   celltype cell0 = bobj.cell_with_lcoord(lcoord_holder,ncells);
-  	        	   int index_ref = cell0.get_cell_id();
+	  	        	 cell0 = (**(bobj)).cell_with_lcoord(lcoord_holder,ncells);
+	  	        	 index_ref = cell0.get_cell_id();
 
-  	        	   for(long del_c=0; del_c<nb_part_id.size();del_c++){
+	  	        	 for(long del_c=0; del_c<nb_part_id.size();del_c++){
+		    	        	   delete_id = nb_part_id[del_c];
+		    	        	   cell0.delete_particle_id(delete_id);
+		    	        	   (**(bobj)).set_cell(cell0,index_ref);  // update cell object with included particle
+		    	     }
 
-	    	        	   delete_id = nb_part_id[del_c];
-
-	    	        	   cell0.delete_particle_id(delete_id);
-
-	    	        	   bobj.set_cell(cell0,index_ref);  // update cell object with included particle
-	    	       }
-
-  	        	   // clear the particle id list
-                   nb_part_id.clear();
-
-	    	         // here clean instantaneously the particle ids after writing delete list method in class
+	  	        	 // clear the particle id list
+	                 nb_part_id.clear();
 
 	    	    } // loop over each neighbor sub total
 	            nb_ptr += count_list[j]; // updating neigbor pointer
 
 	            *to_send_list[j] =  buf_counter * 0.1; //10 attributes for each particle
-
 
 	} // end of Neighbor cpu loop
 
@@ -1515,18 +1427,24 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	// particle counters for neighbor communications
     long to_recv_1 =0, to_recv_2 =0, to_recv_3 =0, to_recv_4 =0, to_recv_5 =0, to_recv_6 =0, to_recv_7 =0;
 
-    long* to_recv_list[7] ={&to_recv_1, &to_recv_2, &to_recv_3, &to_recv_4, &to_recv_5, &to_recv_6, &to_recv_7 };
+    //long* to_recv_list[7] ={&to_recv_1, &to_recv_2, &to_recv_3, &to_recv_4, &to_recv_5, &to_recv_6, &to_recv_7 };
+
+    long** to_recv_list; to_recv_list = new long* [7];
+
+    to_recv_list[0] = &to_recv_1; to_recv_list[1] = &to_recv_2; to_recv_list[2] = &to_recv_3; to_recv_list[3] = &to_recv_4;
+    to_recv_list[4] = &to_recv_5; to_recv_list[5] = &to_recv_6; to_recv_list[6] = &to_recv_7;
 
 	// synchronize communication
 	MPI_Barrier(comm_name);
 
+	// Now send to neighbor from whom I received request and
+	// receive from neighbor to whom I send request
 
 	// z direction communication
 	for (int ind=0;ind<4;ind++){
 
 	     if (z%2==0){ // if z is even
 
-	       //send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
 	       send_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
 
 	       MPI_Send(to_send_list[ind],1,MPI_LONG,send_id,0,comm_name);
@@ -1537,9 +1455,7 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	    	   cout << "      "<< endl;
 	       }
 
-	       //rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
 	       rec_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
-
 
 	       MPI_Recv(to_recv_list[ind],1,MPI_LONG,rec_id,1,comm_name,&stat);
 
@@ -1552,7 +1468,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	     }
 	     else{       // if z is odd
 
-	       //rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
 	       rec_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
 
 	       MPI_Recv(to_recv_list[ind],1,MPI_LONG,rec_id,0,comm_name,&stat);
@@ -1563,7 +1478,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	    	   cout << "      "<< endl;
 	       }
 
-	       //send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
 	       send_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
 
 	       MPI_Send(to_send_list[ind],1,MPI_LONG,send_id,1,comm_name);
@@ -1583,14 +1497,12 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
 		cout << "   MPI Communication in X direction     " << endl;
 		cout << "      "<< endl;
-
 	}
 
 	// x direction communication
 	if (x%2 == 0){    // if x is even
 	         // right & left comm
 
-		   //send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
 		   send_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
 
 		   MPI_Send(to_send_list[4],1,MPI_LONG,send_id,2,comm_name);
@@ -1601,7 +1513,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	    	   cout << "      "<< endl;
 	       }
 
-	       //rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
 	       rec_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
 
 	       MPI_Recv(to_recv_list[4],1,MPI_LONG,rec_id,3,comm_name,&stat);
@@ -1613,7 +1524,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	       }
 
 	         // top-right & bottom-left comm
-	       //send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
 	       send_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
 
 
@@ -1626,7 +1536,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	    	   cout << "      "<< endl;
 	       }
 
-	       //rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
 	       rec_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
 
 	       MPI_Recv(to_recv_list[5],1,MPI_LONG,rec_id,5,comm_name,&stat);
@@ -1640,7 +1549,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	}
 	else{            // if x is odd
 
-		   //rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
 		   rec_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
 
 		   // right & left comm
@@ -1652,7 +1560,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	    	   cout << "      "<< endl;
 	       }
 
-	       //send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
 	       send_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
 
 	       MPI_Send(to_send_list[4],1,MPI_LONG,send_id,3,comm_name);
@@ -1663,7 +1570,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	    	   cout << "      "<< endl;
 	       }
 
-	       //rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
 	       rec_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
 
 	       // top-right & bottom-left comm
@@ -1675,7 +1581,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	    	   cout << "      "<< endl;
 	       }
 
-	       //send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
 	       send_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
 
 	       MPI_Send(to_send_list[5],1,MPI_LONG,send_id,5,comm_name);
@@ -1699,9 +1604,7 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
 	if (y%2 == 0){      // if y is even
 
-		   //send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
 		   send_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
-
 
 		   // top & bottom comm
 		   MPI_Send(to_send_list[6],1,MPI_LONG,send_id,6,comm_name);
@@ -1712,9 +1615,7 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	    	   cout << "      "<< endl;
 	       }
 
-	       //rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
 	       rec_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
-
 
 	       MPI_Recv(to_recv_list[6],1,MPI_LONG,rec_id,7,comm_name,&stat);
 
@@ -1726,7 +1627,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	}
 	else{              // if y is odd
 
-		   //rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
 		   rec_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
 
 		   MPI_Recv(to_recv_list[6],1,MPI_LONG,rec_id,6,comm_name,&stat);
@@ -1737,7 +1637,6 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	    	   cout << "      "<< endl;
 	       }
 
-	       //send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
 	       send_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
 
 	       MPI_Send(to_send_list[6],1,MPI_LONG,send_id,7,comm_name);
@@ -1752,7 +1651,7 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
 	// synchronize communication
 	MPI_Barrier(comm_name);
-
+//
 	//========================================================================================================
 
 	double *my_0, *my_1, *my_2, *my_3, *my_4, *my_5, *my_6; // to be received and filled in sphere cells
@@ -1762,12 +1661,16 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	my_3 = new double [*to_recv_list[3]*10]; my_4= new double [*to_recv_list[4]*10]; my_5 = new double [*to_recv_list[5]*10];
 	my_6 = new double [*to_recv_list[6]*10];
 
-	double* my_buffer[7] = {my_0,my_1,my_2,my_3,my_4,my_5,my_6};
+	double** my_buffer; my_buffer =new double* [7];
 
-	//*********************************************************************************************************************************
-    //                                            send/receive buffers to/from corresponding neighbors
-	//*********************************************************************************************************************************
-
+	my_buffer[0] = my_0;  my_buffer[1] = my_1; my_buffer[2] = my_2;
+	my_buffer[3] = my_3;  my_buffer[4] = my_4; my_buffer[5] = my_5;
+	my_buffer[6] = my_6;
+//
+//	//*********************************************************************************************************************************
+//    //                                            send/receive buffers to/from corresponding neighbors
+//	//*********************************************************************************************************************************
+//
 	// synchronize communication
 	MPI_Barrier(comm_name);
 
@@ -1821,67 +1724,67 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
           MPI_Send(nb_buffer[6],(*to_send_list[6]*10),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),12,comm_name);
     }
 
-//	if(prank == 7){
-//
-//		int j=2; // neighbor order
-//		int par_coun = *to_send_list[j];
-//		cout<<"=====================================" <<endl;
-//		cout<< " Send particles check : " << endl;
-//		cout<< " My rank : " << prank << endl;
-//		cout<<"=====================================" <<endl;
-//
-//		for(int i=0;i<par_coun;i++){
-//			cout << "  " <<endl;
-//			cout << "Particle id   : " <<*(nb_buffer[j]+ (10*i+0)) << endl;
-//			cout << "Particle type : " <<*(nb_buffer[j]+ (10*i+1)) << endl;
-//			cout << "Particle mass : " <<*(nb_buffer[j]+ (10*i+2)) << endl;
-//			cout << "Particle pos_x: " <<*(nb_buffer[j]+ (10*i+3)) << endl;
-//			cout << "Particle pos_y: " <<*(nb_buffer[j]+ (10*i+4)) << endl;
-//			cout << "Particle pos_z: " <<*(nb_buffer[j]+ (10*i+5)) << endl;
-//			cout << "Particle vel_x: " <<*(nb_buffer[j]+ (10*i+6)) << endl;
-//			cout << "Particle vel_y: " <<*(nb_buffer[j]+ (10*i+7)) << endl;
-//			cout << "Particle vel_z: " <<*(nb_buffer[j]+ (10*i+8)) << endl;
-//			cout << "Particle E_pot: " <<*(nb_buffer[j]+ (10*i+9)) << endl;
-//            cout << "  " <<endl;
-//
-//			cout<<"=====================================" <<endl;
-//		}
-//
-//	}
-//
-//
-//	if(prank == test_rank){
-//
-//		int j=2; // neighbor order
-//		int par_coun = *to_recv_list[j];
-//		cout<<"=====================================" <<endl;
-//		cout<< " Received particles check : " << endl;
-//		cout<< " My rank : " << prank << endl;
-//		cout<<"=====================================" <<endl;
-//
-//		for(int i=0;i<par_coun;i++){
-//			cout << "  " <<endl;
-//			cout << "Particle id   : " <<*(my_buffer[j]+ (10*i+0)) << endl;
-//			cout << "Particle type : " <<*(my_buffer[j]+ (10*i+1)) << endl;
-//			cout << "Particle mass : " <<*(my_buffer[j]+ (10*i+2)) << endl;
-//			cout << "Particle pos_x: " <<*(my_buffer[j]+ (10*i+3)) << endl;
-//			cout << "Particle pos_y: " <<*(my_buffer[j]+ (10*i+4)) << endl;
-//			cout << "Particle pos_z: " <<*(my_buffer[j]+ (10*i+5)) << endl;
-//			cout << "Particle vel_x: " <<*(my_buffer[j]+ (10*i+6)) << endl;
-//			cout << "Particle vel_y: " <<*(my_buffer[j]+ (10*i+7)) << endl;
-//			cout << "Particle vel_z: " <<*(my_buffer[j]+ (10*i+8)) << endl;
-//			cout << "Particle E_pot: " <<*(my_buffer[j]+ (10*i+9)) << endl;
-//            cout << "  " <<endl;
-//
-//			cout<<"=====================================" <<endl;
-//		}
-//
-//	}
+	if(prank == 7){
+
+		int j=2; // neighbor order
+		int par_coun = *to_send_list[j];
+		cout<<"=====================================" <<endl;
+		cout<< "     Inside construct sphere      " <<endl;
+		cout<< " Send particles check : " << endl;
+		cout<< " My rank : " << prank << endl;
+		cout<<"=====================================" <<endl;
+
+		for(int i=0;i<par_coun;i++){
+			cout << "  " <<endl;
+			cout << "Particle id   : " <<*(nb_buffer[j]+ (10*i+0)) << endl;
+			cout << "Particle type : " <<*(nb_buffer[j]+ (10*i+1)) << endl;
+			cout << "Particle mass : " <<*(nb_buffer[j]+ (10*i+2)) << endl;
+			cout << "Particle pos_x: " <<*(nb_buffer[j]+ (10*i+3)) << endl;
+			cout << "Particle pos_y: " <<*(nb_buffer[j]+ (10*i+4)) << endl;
+			cout << "Particle pos_z: " <<*(nb_buffer[j]+ (10*i+5)) << endl;
+			cout << "Particle vel_x: " <<*(nb_buffer[j]+ (10*i+6)) << endl;
+			cout << "Particle vel_y: " <<*(nb_buffer[j]+ (10*i+7)) << endl;
+			cout << "Particle vel_z: " <<*(nb_buffer[j]+ (10*i+8)) << endl;
+			cout << "Particle E_pot: " <<*(nb_buffer[j]+ (10*i+9)) << endl;
+            cout << "  " <<endl;
+
+			cout<<"=====================================" <<endl;
+		}
+
+	}
+
+
+	if(prank == test_rank){
+
+		int j=2; // neighbor order
+		int par_coun = *to_recv_list[j];
+		cout<<"=====================================" <<endl;
+		cout<< "     Inside construct sphere      " <<endl;
+		cout<< " Received particles check : " << endl;
+		cout<< " My rank : " << prank << endl;
+		cout<<"=====================================" <<endl;
+
+		for(int i=0;i<par_coun;i++){
+			cout << "  " <<endl;
+			cout << "Particle id   : " <<*(my_buffer[j]+ (10*i+0)) << endl;
+			cout << "Particle type : " <<*(my_buffer[j]+ (10*i+1)) << endl;
+			cout << "Particle mass : " <<*(my_buffer[j]+ (10*i+2)) << endl;
+			cout << "Particle pos_x: " <<*(my_buffer[j]+ (10*i+3)) << endl;
+			cout << "Particle pos_y: " <<*(my_buffer[j]+ (10*i+4)) << endl;
+			cout << "Particle pos_z: " <<*(my_buffer[j]+ (10*i+5)) << endl;
+			cout << "Particle vel_x: " <<*(my_buffer[j]+ (10*i+6)) << endl;
+			cout << "Particle vel_y: " <<*(my_buffer[j]+ (10*i+7)) << endl;
+			cout << "Particle vel_z: " <<*(my_buffer[j]+ (10*i+8)) << endl;
+			cout << "Particle E_pot: " <<*(my_buffer[j]+ (10*i+9)) << endl;
+            cout << "  " <<endl;
+
+			cout<<"=====================================" <<endl;
+		}
+
+	}
 
 	// synchronize communication
 	MPI_Barrier(comm_name);
-
-    // **************************************************************************
 
     //========================================================================================================================
 	//                                                  Phase-3
@@ -1889,19 +1792,20 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     //                analyze received buffers and fill into sphere cells if necessary
 	//========================================================================================================================
 
-    // **************************************************************************
-    // **************************************************************************
-    celltype sphere_cell, sphere_old;    // contains particles in spherical domain for LOCAL MD simulation
-    particle atom,my_atom;   // particle object
+	// contains particles in spherical domain for LOCAL MD simulation
+    celltype* sphere_cell; sphere_cell = new celltype;
 
-	//int sam_cell_counter = (cpu_cell_dim.x/2 * cpu_cell_dim.y/2 * cpu_cell_dim.z/2 );   // no of sample cells belonging to window
+    celltype* sphere_old;  sphere_old  = new celltype;
 
-    // New definition
-	int sam_cell_counter = (cpu_cell_dim.x* cpu_cell_dim.y* cpu_cell_dim.z );   // no of sample cells belonging to window
+    // particle object
+    particle* atom;        atom = new particle;
+    particle* my_atom;  my_atom = new particle;
 
-	celltype sample_cells[sam_cell_counter];  // sample cells for given window type
+    vector<celltype> sample_cells;
 
-	long ncells_3 = bobj.get_cell_list_size();
+    int sam_cell_counter = (cpu_cell_dim.x * cpu_cell_dim.y * cpu_cell_dim.z );   // no of sample cells belonging to window
+
+	long ncells_3 = (**(bobj)).get_cell_list_size();
 
     int count=0;
 
@@ -1911,15 +1815,17 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     	for(int j=0;j<cpu_cell_dim.y;j++){
     		for(int k=0;k<cpu_cell_dim.z;k++){
     			test.x = i; test.y = j; test.z = k;
-    			sample_cells[count] = bobj.cell_with_lcoord(test,ncells_3);
+    			sample_cells.push_back((**(bobj)).cell_with_lcoord(test,ncells_3));
     			// add to sample factor (INCLUDE LATER!!)
     			//bobj.cell_with_lcoord(test,ncells_3).add_sample();
-                count++;
     		}// k loop
     	}// j loop
     }// i loop
 
-
+    cout << "//////////////////////////////////////////////////" << endl;
+    cout << "                  My rank  :           " << prank << endl;
+    cout << "     Sample cells counter : " << sample_cells.size() << endl;
+    cout << "//////////////////////////////////////////////////" << endl;
 
 
     // Reference particle position
@@ -1951,21 +1857,24 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     	if(p_count !=0){                  // check for empty buffer
          	for (long i=0; i< p_count; i++){
 
-         		  atom.set_mynumber((long) *(my_buffer[j]+buf_ind++));
-                  atom.set_mytype((int) *(my_buffer[j]+buf_ind++));
-                  atom.set_mymass((double) *(my_buffer[j]+buf_ind++));
+         		  (*(atom)).set_mynumber((long) *(my_buffer[j]+buf_ind++));
+         		  (*(atom)).set_mytype((int) *(my_buffer[j]+buf_ind++));
+         		  (*(atom)).set_mymass((double) *(my_buffer[j]+buf_ind++));
 
                   // shifting origin of coordinate system
                   temp_position_x = (double) (*(my_buffer[j]+buf_ind++) - ref_xmin);
                   temp_position_y = (double) (*(my_buffer[j]+buf_ind++) - ref_ymin);
                   temp_position_z = (double) (*(my_buffer[j]+buf_ind++) - ref_zmin);
 
-                  atom.set_myposition(temp_position_x,temp_position_y,temp_position_z);
-                  atom.set_myvelocity((double) *(my_buffer[j]+buf_ind++),(double) *(my_buffer[j]+buf_ind++),(double) *(my_buffer[j]+buf_ind++));
-                  atom.set_myepot((double) *(my_buffer[j]+buf_ind++));
+                  (*(atom)).set_myposition(temp_position_x,temp_position_y,temp_position_z);
+                  (*(atom)).set_myvelocity((double) *(my_buffer[j]+buf_ind++),(double) *(my_buffer[j]+buf_ind++),(double) *(my_buffer[j]+buf_ind++));
+                  (*(atom)).set_myepot((double) *(my_buffer[j]+buf_ind++));
 
                   // appending particle instance to sphere cell list
-                  sphere_cell.add_particle(atom);
+                  (*(sphere_cell)).add_particle((*(atom)));
+
+                  // adding to catalog_list
+                  (**(catalog+0)).add_particle((*(atom)));
     	    }
     	}
     }
@@ -1980,14 +1889,12 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     	cout<< "===============================================" << endl;
     	cout<< " " << endl;
         cout<< " Total received particles from my neighbors :  " << rec_counter << endl;
-        cout<< " Total particles from neighbor in sphere cell : "<< sphere_cell.get_nparticles()<<endl;
+        cout<< " Total particles from neighbor in sphere cell : "<< (*(sphere_cell)).get_nparticles()<<endl;
         cout<< " Total no of sample cells  : " << sam_cell_counter << endl;
         cout<< " minimum boundary  :  " << ref_xmin <<"  "<<ref_ymin <<"  "<< ref_zmin<<"  "<< endl;
         cout<< " " << endl;
     	cout<< "===============================================" << endl;
     }
-
-
 
     //*************************************************************
     //                   My particle part -fill sphere cells
@@ -1997,14 +1904,15 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     // shift to origin
     int my_temp_type;
 
-    for(int j=0; j<sam_cell_counter; j++){ // loop over sample cells
+    //for(int j=0; j<sam_cell_counter; j++){ // loop over sample cells
+    for(int j=0; j<sample_cells.size(); j++){ // loop over sample cells
 
     	p_count = sample_cells[j].get_nparticles(); // no of particles in each sample cell
 
     	for(long i=0; i< p_count; i++){ // loop over particles
 
-    		atom = sample_cells[j].get_particle(i);
-            my_curr = atom.get_myposition();
+    		(*(atom)) = sample_cells[j].get_particle(i);
+            my_curr = (*(atom)).get_myposition();
 
 	        dist_check = distance_vect(ref_position,my_curr);
 
@@ -2013,7 +1921,7 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 		            // declare virtual particles on sphere boundary
 		            if( dist_check > r_sphere ){
 
-		            	 my_temp_type = atom.get_mytype();
+		            	 my_temp_type = (*(atom)).get_mytype();
 
 		                 // ignore placeholders on sphere wall
 	                     if (my_temp_type !=  2 ) { // HC: now hardcoded for placeholders
@@ -2021,14 +1929,18 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 	                	        my_temp_type = my_temp_type + real_types ;
 
 	                	        // shifting origin of coordinate system
-	                            temp_position_x = atom.get_myposition().x - ref_xmin;
-	                            temp_position_y = atom.get_myposition().y - ref_ymin;
-	                            temp_position_z = atom.get_myposition().z - ref_zmin;
+	                            temp_position_x = (*(atom)).get_myposition().x - ref_xmin;
+	                            temp_position_y = (*(atom)).get_myposition().y - ref_ymin;
+	                            temp_position_z = (*(atom)).get_myposition().z - ref_zmin;
 
-	                            atom.set_myposition(temp_position_x,temp_position_y,temp_position_z); // update shifted position
-	                	        atom.set_mytype(my_temp_type); // update virtual type
+	                            (*(atom)).set_myposition(temp_position_x,temp_position_y,temp_position_z); // update shifted position
+	                            (*(atom)).set_mytype(my_temp_type); // update virtual type
 
-                                sphere_cell.add_particle(atom);
+                                (*(sphere_cell)).add_particle((*(atom)));
+
+                                // adding to catalog_list
+                                (**(catalog+0)).add_particle((*(atom)));
+
 	                     }
 		            }
 		            else{ // include all particles inside mc_rsweep
@@ -2037,97 +1949,111 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
                         // add particle to catalog list
                         lcoord_holder = sample_cells[j].get_cell_loc_coord();
 
-                        part_holder = bobj.cell_with_lcoord(lcoord_holder,ncells).get_particle(i);
+                        part_holder = (**(bobj)).cell_with_lcoord(lcoord_holder,ncells).get_particle(i);
 
-                         //part_holder = sample_cells[j].get_particle(i);
-                         catalog_list[7].add_particle(part_holder);
+                         (**(catalog+8)).add_particle(part_holder);
 
                          // pushing particle id
-                         my_part_id.push_back(atom.get_mynumber());
+                         my_part_id.push_back((*(atom)).get_mynumber());
 
                 	     // shifting origin of coordinate system
-                         temp_position_x = atom.get_myposition().x - ref_xmin;
-                         temp_position_y = atom.get_myposition().y - ref_ymin;
-                         temp_position_z = atom.get_myposition().z - ref_zmin;
+                         temp_position_x = (*(atom)).get_myposition().x - ref_xmin;
+                         temp_position_y = (*(atom)).get_myposition().y - ref_ymin;
+                         temp_position_z = (*(atom)).get_myposition().z - ref_zmin;
 
-                         atom.set_myposition(temp_position_x,temp_position_y,temp_position_z); // update shifted position
+                         (*(atom)).set_myposition(temp_position_x,temp_position_y,temp_position_z); // update shifted position
 
-		            	 sphere_cell.add_particle(atom);
+		            	 (*(sphere_cell)).add_particle((*(atom)));
 
-		            	 // update particle counter
-		            	 //p_count = bobj.cell_with_lcoord(lcoord_holder,ncells).get_nparticles();
+		                  // adding to catalog_list
+		                  (**(catalog+0)).add_particle((*(atom)));
+
 		            }
 	        } // end of cut-off check
 
     	} // loop over particles
 
     	// Deletion part of included particles
+    	cell0 = (**(bobj)).cell_with_lcoord(lcoord_holder,ncells);
 
- 	   celltype cell0 = bobj.cell_with_lcoord(lcoord_holder,ncells);
- 	   int index_ref = cell0.get_cell_id();
+    	//cell0 = bobj.cell_with_lcoord(lcoord_holder,ncells);
+     	index_ref = cell0.get_cell_id();
 
- 	   for(long del_c=0; del_c<my_part_id.size(); del_c++){
+     	for(long del_c=0; del_c<my_part_id.size(); del_c++){
+           	   delete_id = my_part_id[del_c];
+           	   cell0.delete_particle_id(delete_id);
+           	   (**(bobj)).set_cell(cell0,index_ref);  // update cell object with included particle
+        }
 
-       	   delete_id = my_part_id[del_c];
-
-       	   cell0.delete_particle_id(delete_id);
-
-       	   bobj.set_cell(cell0,index_ref);  // update cell object with included particle
-       }
-   	   // clear the particle id list
-       my_part_id.clear();
-
+       	// clear the particle id list
+        my_part_id.clear();
 
     } // loop over sample cells
 
     // adding randomly chosen particle of own cpu
-    my_atom = pobj;
+    (*(my_atom)) = pobj;
 
+//    (**(catalog+8)).add_particle((*(atom))); // for my CPU part
+
+    // Now delete in cpu_block
+//    ivec3d pobj_gcoord; ivec3d pobj_lcoord;
+//    double pobj_position[3];
+//
+//    // particle position
+//    pobj_position[0] = pobj.get_myposition().x;
+//    pobj_position[1] = pobj.get_myposition().y;
+//    pobj_position[2] = pobj.get_myposition().z;
+//
+//    // CPU global position
+//    ivec3d pobj_CPU_pos = get_cpu_gcoord(prank,comm_name);
+//
+//    // get global coordinate
+//    pobj_gcoord = get_particle_glob_coordinate(pobj_position,cell_dim);
+//
+//    // get local coordinate
+//    pobj_lcoord = get_cell_loc_coord(pobj_gcoord,pobj_CPU_pos,cpu_cell_dim);
+//
+//    // get total particles
+//    long pobj_ncells = (**(bobj)).get_cell_list_size();
+//
+//    // get cell_id
+//     celltype pobj_cell0 = (**(bobj)).cell_with_lcoord(pobj_lcoord,pobj_ncells);
+//
+//     pobj_cell0.delete_particle(pobj.get_mynumber());
+//
+//     int pobj_index = pobj_cell0.get_cell_id();
+//
+//     //update cell block
+//     (**(bobj)).set_cell(pobj_cell0,pobj_index);
 
     // shifting origin of coordinate system
-    temp_position_x = my_atom.get_myposition().x - ref_xmin;
-    temp_position_y = my_atom.get_myposition().y - ref_ymin;
-    temp_position_z = my_atom.get_myposition().z - ref_zmin;
+    temp_position_x = (*(my_atom)).get_myposition().x - ref_xmin;
+    temp_position_y = (*(my_atom)).get_myposition().y - ref_ymin;
+    temp_position_z = (*(my_atom)).get_myposition().z - ref_zmin;
 
-    my_atom.set_myposition(temp_position_x,temp_position_y,temp_position_z);
+    (*(my_atom)).set_myposition(temp_position_x,temp_position_y,temp_position_z);
 
     // flip its type to real Carbon (SWAPPING PLACEHOLDER INTO CARBON)
-
-    //sphere_cell.get_particle(my_atom.get_mynumber()).set_mytype(1);
-    my_atom.set_mytype(1);
+    // NOTE: OTHER TRIAL MOVE HAS TO BE INCLUDED
+    (*(my_atom)).set_mytype(1);
 
     // adding chosen particle
-    sphere_cell.add_particle(my_atom);
+    (*(sphere_cell)).add_particle((*(my_atom)));
+
+    // adding to catalog_list
+    (**(catalog+0)).add_particle((*(atom))); // for whole sphere
 
     // creating reference sphere configuration
-    sphere_old = sphere_cell;
-
-    // catalog update part
-    *(catalog+0) = &sphere_old;
-    *(catalog+1) = &catalog_list[0];
-	*(catalog+2) = &catalog_list[1];
-	*(catalog+3) = &catalog_list[2];
-	*(catalog+4) = &catalog_list[3];
-	*(catalog+5) = &catalog_list[4];
-	*(catalog+6) = &catalog_list[5];
-	*(catalog+7) = &catalog_list[6];
-	*(catalog+8) = &catalog_list[7];
-
-
-    // ***********************************************************************
-    // INCLUDE OTHER TWO TRIAL MOVES HERE
-    // ***********************************************************************
+    (*(sphere_old)) = (*(sphere_cell));
 
     if(prank == test_rank){
-
     	celltype loc_cell;
     	cout<< "===============================================" << endl;
     	cout<< " --------------  Inside construct sphere ---------" << endl;
     	cout<< " " << endl;
         cout<< " Total particles for sphere :  " << rec_counter << endl;
-        cout<< " Total particles (neighbor + my part ) sphere_cell : "<< sphere_cell.get_nparticles()<<endl;
-        cout<< " Total particles (neighbor + my part ) sphere_old: "<< sphere_old.get_nparticles()<<endl;
-
+        cout<< " Total particles (neighbor + my part ) sphere_cell : "<< (*(sphere_cell)).get_nparticles()<<endl;
+        cout<< " Total particles (neighbor + my part ) sphere_old: "<< (*(sphere_old)).get_nparticles()<<endl;
         cout << "------- cell catalog check ---- " << endl;
         int loc_sum=0;
         for(int i=0; i<9; i++){
@@ -2135,13 +2061,8 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
         	cout << "no of particles in  **(catalog_list+" <<i<<") :" << loc_cell.get_nparticles() << endl;
         	loc_sum+=loc_cell.get_nparticles();
         }
-
         cout <<" total particles for neighbor : "<< loc_sum << endl;
         cout << "---------------------------------"<< endl;
-
-
-
-
         cout<< " " << endl;
     	cout<< "===============================================" << endl;
     }
@@ -2164,10 +2085,10 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
     //ofstream fout(filename, ios_base::out);
     ofstream fout(filename_local, ios_base::out);
 
-    cout<<" Sphere constructor writing to file : " << filename << endl;
+    //cout<<" Sphere constructor writing to file : " << filename << endl;
 
     //********** loop over revised sphere cell list - 2 **************
-    long fp_total = sphere_cell.get_nparticles();
+    long fp_total = (*(sphere_cell)).get_nparticles();
 
 
     // print IMD header -- check
@@ -2182,12 +2103,12 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
     for(long fp=0; fp<fp_total; fp++){
 
-        	file_number  = sphere_cell.get_particle(fp).get_mynumber();
-        	file_type    = sphere_cell.get_particle(fp).get_mytype();
-        	file_mass    = sphere_cell.get_particle(fp).get_mymass();
-        	file_pos     = sphere_cell.get_particle(fp).get_myposition();
-        	file_vel     = sphere_cell.get_particle(fp).get_myvelocity(); // optional with #ifdef or so
-        	file_epot    = sphere_cell.get_particle(fp).get_myepot();
+        	file_number  = (*(sphere_cell)).get_particle(fp).get_mynumber();
+        	file_type    = (*(sphere_cell)).get_particle(fp).get_mytype();
+        	file_mass    = (*(sphere_cell)).get_particle(fp).get_mymass();
+        	file_pos     = (*(sphere_cell)).get_particle(fp).get_myposition();
+        	file_vel     = (*(sphere_cell)).get_particle(fp).get_myvelocity(); // optional with #ifdef or so
+        	file_epot    = (*(sphere_cell)).get_particle(fp).get_myepot();
 
             	  // file flush
 
@@ -2208,45 +2129,32 @@ cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char*
 
     fout.close(); // closing outfile connection
 
-    //}
-
-
 
     // DELETE BUFFER MEMORY ACCORDINGLY
+	// clear allocated vectors
+	nb_cells.clear();
+	nb_part_id.clear();
+	my_part_id.clear();
+	sample_cells.clear();
+
+    delete rec_pos;
+    delete count_list;
+    delete to_send_list;
+    delete to_recv_list;
+
     delete[] nb_0; delete[] nb_1;delete[] nb_2; delete[] nb_3;
     delete[] nb_4;delete[] nb_5;delete[] nb_6;
+
+    delete nb_buffer;
+    delete my_buffer;
 
     delete[] my_0; delete[] my_1;delete[] my_2; delete[] my_3;
     delete[] my_4;delete[] my_5;delete[] my_6;
 
-	//return sphere_old;
-
-    block_obj = bobj;
-
-    //return bobj;
-
-
-	if(prank == test_rank){
-	   long tot_particles = 0;
-       for(int i=0; i<bobj.get_cell_list_size(); i++){
- 	             //cout << " No of particles in cell id  [ " << i << " ] : "<< bobj.get_cell(i).get_nparticles()  << endl;
-
-    	         tot_particles += bobj.get_cell(i).get_nparticles();
-       }
-
-       cout << "****************************************************" << endl;
-       cout << " Total particles check -- before exiting construct sphere in CPU " << tot_particles << endl;
-       cout << "****************************************************" << endl;
-
-	}
-
-    //return sphere_old;
-
-	//return bobj;
-    return block_obj;
+    delete sphere_old; delete sphere_cell;
+    delete atom; delete my_atom;
 
 }
-
 
 // pass IMD_executable and param file as arguments
 void do_local_mdrun(string bin_name,string param_name,int prank){
@@ -2324,36 +2232,9 @@ void do_local_mdrun(string bin_name,string param_name,int prank){
     system(cmd4_ptr); // remove param clone
 }
 
-
-
-//==================================================================================================================
-
-cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* data_list,
+void read_update_config (int win_id,particle pobj,cellblock** bobj,double* data_list,
 			int prank,int test_rank,vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name,celltype** catalog){
 
-	// list of cells containing particles,deleted while exporting to neighbors
-	celltype loc_old_sphere,loc_nb0,loc_nb1,loc_nb2,loc_nb3,loc_nb4,loc_nb5,loc_nb6,loc_my;
-
-	cellblock read_block;
-
-	celltype * del_part_list;
-	del_part_list = new celltype [9];
-
-
-	if(prank == test_rank){
-	   long tot_particles = 0;
-       for(int i=0; i<bobj.get_cell_list_size(); i++){
-    	         tot_particles += bobj.get_cell(i).get_nparticles();
-       }
-
-       cout << "****************************************************" << endl;
-       cout << " Total particles check -- read update method in CPU " << tot_particles << endl;
-       cout << "****************************************************" << endl;
-
-	}
-
-
-    //celltype my_update_part;
 
 	vec3d simbox_size;
     double rsweep      = data_list[1];  // sphere radius
@@ -2370,8 +2251,11 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
 	//         Phase 1 - File reading part             //
     //----------------------------------------------//
 
-    celltype sphere_new;            // contains particles in spherical domain after LOCAL MD simulation
-    particle updated_atom;          // particle object
+	// contains particles in spherical domain after LOCAL MD simulation
+    celltype* sphere_new;    sphere_new = new celltype;
+
+    // particle object
+    particle* updated_atom;  updated_atom = new particle;
 
 	int accep_tag=0;
 	const int LIMIT=10000;
@@ -2387,7 +2271,6 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
 
     //string str_fname    = "MC_sphere_config_p_"+to_string(prank)+ ".chkpt";
 
-    // TO BE UPDATED WITH RELAX OR SNAPSHOT FILE
     string str_fname    = "./sphere_out/MC_sphere_config_p_" + to_string(prank) + "_relax.00000.chkpt";
 
     cout<< " sphere file check : " << str_fname << endl;
@@ -2447,104 +2330,57 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
     fin.clear(); // resetting bit states
     fin.close();
 
-
-
     // loop over file buffers for constructing updated sphere
 
     int p_con=0, v_con=0;
     for(int count=0; count<fbuffer_id.size()-1;count++){
 
-    	updated_atom.set_mynumber(fbuffer_id[count]);
-    	updated_atom.set_mytype(fbuffer_type[count]);
-    	updated_atom.set_mymass(fbuffer_mass[count]);
-    	updated_atom.set_myposition(fbuffer_pos_x[p_con++],fbuffer_pos_y[p_con++],fbuffer_pos_z[p_con++]);
-    	updated_atom.set_myvelocity(fbuffer_vel_x[v_con++],fbuffer_vel_y[v_con++],fbuffer_vel_z[v_con++]);
-    	updated_atom.set_myepot(fbuffer_epot[count]);
+    	(*(updated_atom)).set_mynumber(fbuffer_id[count]);
+    	(*(updated_atom)).set_mytype(fbuffer_type[count]);
+    	(*(updated_atom)).set_mymass(fbuffer_mass[count]);
+    	(*(updated_atom)).set_myposition(fbuffer_pos_x[p_con++],fbuffer_pos_y[p_con++],fbuffer_pos_z[p_con++]);
+    	(*(updated_atom)).set_myvelocity(fbuffer_vel_x[v_con++],fbuffer_vel_y[v_con++],fbuffer_vel_z[v_con++]);
+    	(*(updated_atom)).set_myepot(fbuffer_epot[count]);
 
     	// appending particle instance to sphere cell list
-    	sphere_new.add_particle(updated_atom);
+    	(*(sphere_new)).add_particle((*(updated_atom)));
     }
-
-    cout <<"==============================================" << endl;
-    cout <<" my rank : " << prank << endl;
-    cout << " particles count in new sphere check " << sphere_new.get_nparticles()<<endl;
-    cout <<"==============================================" << endl;
-
-
-    // cell containing deleted part list: old_sphere, neighbors 1-7 and my sphere portion
-    // assigning nb_cells from catalog
-    loc_old_sphere  = **(catalog+0);
-    loc_nb0         = **(catalog+1);
-    loc_nb1         = **(catalog+2);
-    loc_nb2         = **(catalog+3);
-    loc_nb3         = **(catalog+4);
-    loc_nb4         = **(catalog+5);
-    loc_nb5         = **(catalog+6);
-    loc_nb6         = **(catalog+7);
-    loc_my          = **(catalog+8);
-
-    // assigning delete particles list
-	del_part_list[0] = loc_old_sphere;
-	del_part_list[1] = loc_nb0;
-	del_part_list[2] = loc_nb1;
-	del_part_list[3] = loc_nb2;
-	del_part_list[4] = loc_nb3;
-	del_part_list[5] = loc_nb4;
-	del_part_list[6] = loc_nb5;
-	del_part_list[7] = loc_nb6;
-	del_part_list[8] = loc_my;
-
-	cout<<"+++++++++++++++++++++++++++++++++++++++" << endl;
-	cout<< "Predominant check " << endl;
-	cout<< "del_part_list[0].get_nparticles()" << del_part_list[0].get_nparticles() << endl;
-	cout<<"+++++++++++++++++++++++++++++++++++++++" << endl;
-
-    if(prank == test_rank){
-
-               long tot_particles=0; // check variable
-               cout << "****************************************************" << endl;
-               cout << " critical check ///////////////////" << endl;
-
-               cout << " No of particles in **(catalog+0 ) : "<< loc_old_sphere.get_nparticles()  << endl;
-        	   cout << " No of particles in **(catalog+1 ) : "<< loc_nb0.get_nparticles()  << endl;
-        	   cout << " No of particles in **(catalog+2 ) : "<< loc_nb1.get_nparticles()  << endl;
-        	   cout << " No of particles in **(catalog+3 ) : "<< loc_nb2.get_nparticles()  << endl;
-        	   cout << " No of particles in **(catalog+4 ) : "<< loc_nb3.get_nparticles()  << endl;
-
-        	   cout << " No of particles in **(catalog+5 ) : "<< loc_nb4.get_nparticles()  << endl;
-        	   cout << " No of particles in **(catalog+6 ) : "<< loc_nb5.get_nparticles()  << endl;
-        	   cout << " No of particles in **(catalog+7 ) : "<< loc_nb6.get_nparticles()  << endl;
-        	   cout << " No of particles in **(catalog+8 ) : "<< loc_my.get_nparticles()  << endl;
-
-
-               //tot_particles += local_cell.get_nparticles();
-
-        	   //cout << " Total particles removed after Construct sphere in CPU 0 " << loc_nb0 << endl;
-               cout << "****************************************************" << endl;
-    }
-
-
-    double my_update_part[10000];
-
-    celltype new_portion;
 
     //----------------------------------------------------------------//
     //                  check here the acceptance condition
     //----------------------------------------------------------------//
 
-    int check_type=0;     // type of acceptance condition
+    // type of acceptance condition (LATER INCLUDE OTHER TYPES AS WELL)
+    int check_type=0;
+
+
+    if(prank == test_rank){
+
+           celltype local_cell;
+           long tot_particles=0; // check variable
+           cout << "****************************************************" << endl;
+
+           for(int i=0; i<9; i++){
+
+        	     local_cell = **(catalog+i);
+
+        	     cout << " No of particles in **(catalog+"<< i << ") : "<< local_cell.get_nparticles()  << endl;
+        	     tot_particles += local_cell.get_nparticles();
+
+           }
+
+           cout << " Total particles removed after Construct sphere in CPU 0 " << tot_particles << endl;
+           cout << "****************************************************" << endl;
+    }
+
+
 
     // new argument catalog
-
-    //if(prank == test_rank){
-
-    accep_tag = acceptance_check(check_type,&loc_old_sphere,&sphere_new);
-
-    //}
+    accep_tag = acceptance_check(check_type,**(catalog+0),(*(sphere_new)));
 
     if(prank == test_rank){
          cout <<"=====================================" << endl;
-         cout <<"    Inside read config Sphere  File Reading part         " << endl;
+         cout <<"    Sphere  File Reading part         " << endl;
          cout <<"           My rank : "<< prank << endl;
          cout <<"------------------------------------ " << endl;
 
@@ -2563,562 +2399,765 @@ cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* da
 
          cout << "  " << endl;
 
-         cout <<" sphere_new particles count : "<< sphere_new.get_nparticles()<<endl;
+         cout <<" sphere_new particles count : "<< (*(sphere_new)).get_nparticles()<<endl;
 
          cout <<" Acceptance decision : " << accep_tag << endl;
 
          cout <<"=====================================" << endl;
     }
 
-        //----------------------------------------------------------------//
-        //         Phase  2- Updating and shifting part                        //
-        //----------------------------------------------------------------//
+    //----------------------------------------------------------------//
+    //         Phase  2- Updating and shifting part                        //
+    //----------------------------------------------------------------//
+
+	// possible neighbor index as per window location
+	int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
+	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
+	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
+
+	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
+
+	// Old assignment
+	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
+	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
+
+	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
 
 
-    	//vector containing updated particles belong to my CPU
-        //vector<particle> my_updated_part;
+	// ==========================================================
+	// Detect neighbor processes (maximum 7 if periodicity is enabled in all direction) as per window position
+	// ==========================================================
 
-    	// possible neighbor index as per window location
-    	int window_x[8] = {-1,-1,+1,+1,-1,-1,+1,+1};
-    	int window_y[8] = {-1,-1,-1,-1,+1,+1,+1,+1};
-    	int window_z[8] = {-1,+1,-1,+1,-1,+1,-1,+1};
+    // select neighbors as per sample window position
+	int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
 
-    	// 8 windows position in CPU (fixed positions -- window 0 to window 7)
+	// send neighbors (to whom I send)        ---- process communications (in z direction)
+	int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
 
-    	// Old assignment
-    	ivec3d win_pos_0 = {0,0,0}; ivec3d win_pos_1 = {0,0,1}; ivec3d win_pos_2 = {1,0,0}; ivec3d win_pos_3 = {1,0,1};
-    	ivec3d win_pos_4 = {0,1,0}; ivec3d win_pos_5 = {0,1,1}; ivec3d win_pos_6 = {1,1,0}; ivec3d win_pos_7 = {1,1,1};
+	// Receive neighbors (from whom I receive) ----- process communications (in z direction)
+	int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
 
-    	ivec3d window_position[8] = {win_pos_0,win_pos_1,win_pos_2,win_pos_3,win_pos_4,win_pos_5,win_pos_6,win_pos_7};
+    // send neighbors (to whom I send) -----  process communications (in x/y direction)
+	int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
 
+	// Receive neighbors (from whom I receive) -----  process communications (in x/y direction)
+	int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
 
-    	// ==========================================================
-    	// Detect neighbor processes (maximum 7 if periodicity is enabled in all direction) as per window position
-    	// ==========================================================
+    // prepare neighbor rank lists from whom I received sphere portions (if any)
+	int rec_nb_rank[7];
 
-        // select neighbors as per sample window position
-    	int xfact = window_x[win_id]; int yfact = window_y[win_id]; int zfact = window_z[win_id];
+	// get my process global coordinate
+	ivec3d gcoord = get_cpu_gcoord(prank,comm_name);
+	int x = gcoord.x; int y = gcoord.y; int z = gcoord.z; // [ x y z] -- this process coordinate from MPI Cartesian system
 
-    	// send neighbors (to whom I send)        ---- process communications (in z direction)
-    	int x_send_phase[4] = { 0,xfact,xfact, 0}; int y_send_phase[4] = { 0, 0,yfact,yfact}; int z_send_phase[4] = {zfact,zfact,zfact,zfact};
+    // Neighbors to whom I send my particles upon request
+	for(int ind=0;ind<4;ind++){
+		rec_nb_rank[ind] = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+	}
 
-    	// Receive neighbors (from whom I receive) ----- process communications (in z direction)
-    	int x_recv_phase[4] = { 0,-xfact,-xfact, 0}; int y_recv_phase[4] = { 0, 0,-yfact,-yfact}; int z_recv_phase[4] = {-zfact,-zfact,-zfact,-zfact};
+	for(int ind=0;ind<3;ind++){
+		rec_nb_rank[4+ind] = get_cpu_rank(x+x_recv_next[ind],y+y_recv_next[ind],z+z_recv_next[ind],comm_name);
+	}
 
-        // send neighbors (to whom I send) -----  process communications (in x/y direction)
-    	int x_send_next[3] = {xfact,xfact, 0 }; int y_send_next[3] = { 0,yfact,yfact }; int z_send_next[3] = { 0, 0, 0 };
+	if(prank == test_rank){
+		cout << "+++++++++++++++++++++++++++++++++" << endl;
+        cout << " from read update config " << endl;
+		cout << " My rank : " << prank << endl;
+		for(int i=0;i<7;i++){
+          cout << " rec_nb_rank["<<i<<"]"<<rec_nb_rank[i] << endl;
+		}
 
-    	// Receive neighbors (from whom I receive) -----  process communications (in x/y direction)
-    	int x_recv_next[3] = {-xfact,-xfact, 0 }; int y_recv_next[3] = { 0,-yfact,-yfact }; int z_recv_next[3] = { 0, 0, 0 };
+		cout << "+++++++++++++++++++++++++++++++++" << endl;
+	}
 
-        // prepare neighbor rank lists from whom I received sphere portions (if any)
-    	int rec_nb_rank[7];
+	// N1 N2 N4 N6 N3 N5 N7
+	double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
 
-    	// get my process global coordinate
-    	ivec3d gcoord = get_cpu_gcoord(prank,comm_name);
-    	int x = gcoord.x; int y = gcoord.y; int z = gcoord.z; // [ x y z] -- this process coordinate from MPI Cartesian system
+    long buff_size = (*(sphere_new)).get_nparticles();
 
+	nb_0 = new double [buff_size*10]; nb_1= new double [buff_size*10]; nb_2 = new double [buff_size*10];
+	nb_3 = new double [buff_size*10]; nb_4= new double [buff_size*10]; nb_5 = new double [buff_size*10];
+	nb_6 = new double [buff_size*10];
 
-    	// process rank list from whom I requested sphere portion
-    	for(int ind=0;ind<4;ind++){
-    		//rec_nb_rank[ind] = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
-    		rec_nb_rank[ind] = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
+	double** nb_buffer; nb_buffer = new double* [7];
+
+	nb_buffer[0] = nb_0; nb_buffer[1] = nb_1; nb_buffer[2] = nb_2;
+	nb_buffer[3] = nb_3; nb_buffer[4] = nb_4; nb_buffer[5] = nb_5; nb_buffer[6] = nb_6;
+
+	// particle counters for neighbor communications
+    long tot_part_1 =0, tot_part_2 =0, tot_part_3 =0, tot_part_4 =0, tot_part_5 =0, tot_part_6 =0, tot_part_7 =0;
+
+    // list of neighbor export particles counter
+    long** to_send_list; to_send_list = new long* [7];
+
+    to_send_list[0] = &tot_part_1; to_send_list[2] = &tot_part_3; to_send_list[4] = &tot_part_5; to_send_list[6] = &tot_part_7;
+    to_send_list[1] = &tot_part_2; to_send_list[3] = &tot_part_4; to_send_list[5] = &tot_part_6;
+
+	// allocate memory (to send to neighbors)
+
+    if(prank == test_rank){
+        cout << " =================================================" << endl;
+    	cout << " Updated neighbor particles Before check " << endl;
+        cout << "  My rank : " << prank << endl;
+        cout << " =================================================" << endl;
+
+    	for(int i=0; i<7; i++){
+    		cout << " to rank : "<< rec_nb_rank[i] << "  and count :" << *to_send_list[i]*0.1<< endl;
     	}
+    	cout << " =================================================" << endl;
+    }
 
-    	for(int ind=0;ind<3;ind++){
-    		//rec_nb_rank[4+ind] = get_cpu_rank(x+x_recv_next[ind],y+y_recv_next[ind],z+z_recv_next[ind],comm_name);
-    		rec_nb_rank[4+ind] = get_cpu_rank(x+x_send_next[ind],y+y_send_next[ind],z+z_send_next[ind],comm_name);
-    	}
+    particle* atom; atom = new particle;
 
-    	if(prank == test_rank){
-    		cout << "+++++++++++++++++++++++++++++++++" << endl;
-            cout << " from read update config " << endl;
-    		cout << " My rank : " << prank << endl;
-    		for(int i=0;i<7;i++){
-              cout << " rec_nb_rank["<<i<<"]"<<rec_nb_rank[i] << endl;
-    		}
+    long total_particles;
 
-    		cout << "+++++++++++++++++++++++++++++++++" << endl;
-    	}
+    accep_tag = 0; // check condition
 
-    	// N1 N2 N4 N6 N3 N5 N7 my_part
-    	double *nb_0, *nb_1, *nb_2, *nb_3, *nb_4, *nb_5, *nb_6; // to be allocated and send
+    if(accep_tag !=0){
 
-    	// particle counters for neighbor communications
-        long tot_part_1 =0, tot_part_2 =0, tot_part_3 =0, tot_part_4 =0, tot_part_5 =0, tot_part_6 =0, tot_part_7 =0;
+    	   // delete all my old particles in my CPU
+    	   (**(catalog+8)).clear_all_particles();
 
-        // list of neighbor export particles counter
-        long* to_send_list[7] = {&tot_part_1,&tot_part_2,&tot_part_3,&tot_part_4,&tot_part_5,&tot_part_6,&tot_part_7};
+    	    if(prank == test_rank){
+    	    	celltype loc_cell;
+    	    	cout<< "===============================================" << endl;
+    	    	cout<< " --------------  After deleting (**(catalog+8))   ---------" << endl;
+    	    	cout<< " " << endl;
+    	        cout << "------- cell catalog check ---- " << endl;
+    	        int loc_sum=0;
+    	        for(int i=0; i<9; i++){
+    	        	loc_cell = **(catalog+i);
+    	        	cout << "no of particles in  **(catalog_list+" <<i<<") :" << loc_cell.get_nparticles() << endl;
+    	        	loc_sum+=loc_cell.get_nparticles();
+    	        }
+    	        cout <<" total particles for neighbor : "<< loc_sum << endl;
+    	        cout << "---------------------------------"<< endl;
+    	        cout<< " " << endl;
+    	    	cout<< "===============================================" << endl;
+    	    }
 
-    	// allocate memory (to send to neighbors)
+            long buf_ind, my_buf_ind, total_particles=0;
 
-        long buff_size =sphere_new.get_nparticles();
+            // temporary holder for particle attributes
+    		double temp_id; double temp_type;
+    		double temp_mass, temp_epot, dist_check;
+    		double temp_vel_x,temp_vel_y,temp_vel_z;
+            double temp_pos_x,temp_pos_y,temp_pos_z;
 
-    	nb_0 = new double [buff_size*10]; nb_1= new double [buff_size*10]; nb_2 = new double [buff_size*10];
-    	nb_3 = new double [buff_size*10]; nb_4= new double [buff_size*10]; nb_5 = new double [buff_size*10];
-    	nb_6 = new double [buff_size*10];
+            double inst_pos[3];
 
-    	double* nb_buffer[7] = {nb_0,nb_1,nb_2,nb_3,nb_4,nb_5,nb_6};
+            double atom_pos[3];
 
-        if(prank == test_rank){
-            cout << " =================================================" << endl;
-        	cout << " Updated neighbor particles Before check " << endl;
-            cout << "  My rank : " << prank << endl;
-            cout << " =================================================" << endl;
-
-        	for(int i=0; i<7; i++){
-        		cout << " to rank : "<< rec_nb_rank[i] << "  and count :" << *to_send_list[i]*0.1<< endl;
-        	}
-        	cout << " =================================================" << endl;
-        }
-
-
-        // Update if configuration get accepted
-
-        //accep_tag = 0; //(for testing)
-
-        if(accep_tag !=0){
-
-        	   // delete all my old particles in my CPU
-
-                particle atom;
-
-                long buf_ind, my_buf_ind, total_particles=0;
-
-                // temporary holder for particle attributes
-        		double temp_id; double temp_type;
-        		double temp_mass, temp_epot, dist_check;
-        		double temp_vel_x,temp_vel_y,temp_vel_z;
-                double temp_pos_x,temp_pos_y,temp_pos_z;
-
-                double inst_pos[3];
-
-                ivec3d cpu_fact,cell_glob_coord,cell_loc_coord, nb_cpu_gcoord;
-                int loc_rank, target, cell_index, type_check;
-
-                long particle_id;
-
-                // get total no of cells in my CPU block
-                long total_cells = bobj.get_cell_list_size();
-
-                for (int i=0; i< (fbuffer_id.size()-1); i++){ // loop over read data
-
-                	type_check = fbuffer_type.at(i);
-
-                	if(type_check < real_types){ // ignore spherical wall particles (CHECK: reconsider this!!)
-
-                	    buf_ind = 0;                      // initialize for each buffer step
-
-                	    // attributes assignments
-                	    temp_id     = (double) fbuffer_id.at(i);
-                        temp_type   = (double) fbuffer_type.at(i);       // type conversion for buffer type consistency
-                	    temp_mass   = fbuffer_mass.at(i);
-
-                	    // position assignments
-                	    temp_pos_x  = fbuffer_pos_x.at(i);
-                	    temp_pos_y  = fbuffer_pos_y.at(i);
-                	    temp_pos_z  = fbuffer_pos_z.at(i);
-
-                 	    // global boundary check and position update to actual box dimensions
-                 	    if (fbuffer_pos_x.at(i) < 0.0)               temp_pos_x += simbox_size.x ;
-                 	    if (fbuffer_pos_x.at(i) > simbox_size.x)     temp_pos_x -= simbox_size.x ;
-                 	    if (fbuffer_pos_y.at(i) < 0.0)               temp_pos_y += simbox_size.y ;
-                 	    if (fbuffer_pos_y.at(i) > simbox_size.y)     temp_pos_y -= simbox_size.y ;
-                 	    if (fbuffer_pos_z.at(i) < 0.0)               temp_pos_z += simbox_size.z ;
-                 	    if (fbuffer_pos_z.at(i) > simbox_size.z)     temp_pos_z -= simbox_size.z ;
-
-
-                        // velocity
-                	    temp_vel_x  = fbuffer_vel_x.at(i);
-                	    temp_vel_y  = fbuffer_vel_y.at(i);
-                	    temp_vel_z  = fbuffer_vel_z.at(i);
-
-                        // potential energy
-                	    temp_epot   = fbuffer_epot.at(i);
-
-                	    inst_pos[0] = temp_pos_x; inst_pos[1] = temp_pos_y; inst_pos[2] = temp_pos_z;
-
-                 	    // global cell coordinate from particle position
-                		cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim); // New try with my method
-
-             		    // CPU global coordinate from cell global coordinate
-             		    nb_cpu_gcoord.x = cell_glob_coord.x / cpu_cell_dim.x;
-             		    nb_cpu_gcoord.y = cell_glob_coord.y / cpu_cell_dim.y;
-             		    nb_cpu_gcoord.z = cell_glob_coord.z / cpu_cell_dim.z;
-
-             		    // CPU rank
-             		    loc_rank = get_cpu_rank(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z,comm_name);
-
-             		    // particle belongs to neighbor
-             		    if (loc_rank != prank){
-             		        //******************************************
-             		        // if loc_rank != my rank fill it in target buffer
-             		        //****************************
-
-             			    // identify buffer target as per rank
-             			    for(int ind=0; ind<7;ind++){
-             				    if(rec_nb_rank[ind] == loc_rank) target=ind;
-             			    }
-
-             			    buf_ind = *to_send_list[target];
-
-             			    // ADD TO BUFFER nb_buffer
-                            *(nb_buffer[target]+buf_ind++)  = temp_id;
-                            *(nb_buffer[target]+buf_ind++)  = temp_type;
-                            *(nb_buffer[target]+buf_ind++)  = temp_mass;
-                            *(nb_buffer[target]+buf_ind++)  = temp_pos_x;
-                            *(nb_buffer[target]+buf_ind++)  = temp_pos_y;
-                            *(nb_buffer[target]+buf_ind++)  = temp_pos_z;
-                            *(nb_buffer[target]+buf_ind++)  = temp_vel_x;
-                            *(nb_buffer[target]+buf_ind++)  = temp_vel_y;
-                            *(nb_buffer[target]+buf_ind++)  = temp_vel_z;
-                            *(nb_buffer[target]+buf_ind++)  = temp_epot;
-
-                            // updating buffer size for every particle belongs to it
-                            *to_send_list[target] = buf_ind;
-
-
-             		    }
-
-             		    else{ // particles from my CPU
-
-             		        // defining particle attributes
-             		        atom.set_mynumber(fbuffer_id.at(i));
-             		        atom.set_mytype(fbuffer_type.at(i));
-             		        atom.set_mymass(fbuffer_mass.at(i));
-             		        atom.set_myposition(fbuffer_pos_x.at(i), fbuffer_pos_y.at(i), fbuffer_pos_z.at(i));
-             		        atom.set_myvelocity(fbuffer_vel_x.at(i),fbuffer_vel_y.at(i),fbuffer_vel_z.at(i));
-             		        atom.set_myepot(fbuffer_epot.at(i));
-
-             		        new_portion.add_particle(atom);
-
-             		    }
-
-                    }// spherical wall check
-
-                } // for loop read data
-
-                // deleting old sphere portion of my CPU
-                loc_my.clear_all_particles();
-
-                // updating new sphere portion of my CPU
-                loc_my = new_portion;
-
-                // assign buffer size to each neighbor CPU
-
-    	} // acceptance condition
-
-    	else{ // rejected condition
-
-    		// updating my part of CPU
-
-    		particle old_atom;
             ivec3d cpu_fact,cell_glob_coord,cell_loc_coord, nb_cpu_gcoord;
             int loc_rank, target, cell_index, type_check;
-            double inst_pos[3];
-            int ncells_loc;
 
-            ncells_loc = bobj.get_cell_list_size();
+            ivec3d atom_cell_glob_coord,atom_cpu_gcoord,atom_cell_loc_coord;
+            celltype* atom_cell_holder;  atom_cell_holder = new celltype;
+            int atom_cell_index=0;
 
-    		for(long i=0; i<loc_my.get_nparticles();i++ ){
 
-                 old_atom = loc_my.get_particle(i);
+            long particle_id;
+
+            // get total no of cells in my CPU block
+            long total_cells = (**(bobj)).get_cell_list_size();
+
+            long atom_ncells = (**(bobj)).get_cell_list_size();
+
+            for (int i=0; i< (fbuffer_id.size()-1); i++){ // loop over read data
+
+            	type_check = fbuffer_type.at(i);
+
+            	// ignore spherical wall particles (CHECK: reconsider this!!)
+            	if(type_check < real_types){
+
+            		buf_ind = 0;                      // initialize for each buffer step
+
+            	    // attributes assignments
+            	    temp_id     = (double) fbuffer_id.at(i);
+                    temp_type   = (double) fbuffer_type.at(i);       // type conversion for buffer type consistency
+            	    temp_mass   = fbuffer_mass.at(i);
+
+            	    // position assignments
+            	    temp_pos_x  = fbuffer_pos_x.at(i);
+            	    temp_pos_y  = fbuffer_pos_y.at(i);
+            	    temp_pos_z  = fbuffer_pos_z.at(i);
+
+             	    // global boundary check and position update to actual box dimensions
+             	    if (fbuffer_pos_x.at(i) < 0.0)               temp_pos_x += simbox_size.x ;
+             	    if (fbuffer_pos_x.at(i) > simbox_size.x)     temp_pos_x -= simbox_size.x ;
+             	    if (fbuffer_pos_y.at(i) < 0.0)               temp_pos_y += simbox_size.y ;
+             	    if (fbuffer_pos_y.at(i) > simbox_size.y)     temp_pos_y -= simbox_size.y ;
+             	    if (fbuffer_pos_z.at(i) < 0.0)               temp_pos_z += simbox_size.z ;
+             	    if (fbuffer_pos_z.at(i) > simbox_size.z)     temp_pos_z -= simbox_size.z ;
+
+
+                    // velocity
+            	    temp_vel_x  = fbuffer_vel_x.at(i);
+            	    temp_vel_y  = fbuffer_vel_y.at(i);
+            	    temp_vel_z  = fbuffer_vel_z.at(i);
+
+                    // potential energy
+            	    temp_epot   = fbuffer_epot.at(i);
+
+            	    inst_pos[0] = temp_pos_x; inst_pos[1] = temp_pos_y; inst_pos[2] = temp_pos_z;
+
+             	    // global cell coordinate from particle position
+            		cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim); // New try with my method
+
+         		    // CPU global coordinate from cell global coordinate
+         		    nb_cpu_gcoord.x = cell_glob_coord.x / cpu_cell_dim.x;
+         		    nb_cpu_gcoord.y = cell_glob_coord.y / cpu_cell_dim.y;
+         		    nb_cpu_gcoord.z = cell_glob_coord.z / cpu_cell_dim.z;
+
+         		    // CPU rank
+         		    loc_rank = get_cpu_rank(nb_cpu_gcoord.x,nb_cpu_gcoord.y,nb_cpu_gcoord.z,comm_name);
+
+         		    // particle belongs to neighbor
+         		    if (loc_rank != prank){
+         		        //******************************************
+         		        // if loc_rank != my rank fill it in target buffer
+         		        //****************************
+
+         			    // identify buffer target as per rank
+         			    for(int ind=0; ind<7;ind++){
+         				    if(rec_nb_rank[ind] == loc_rank) target=ind;
+         			    }
+
+         			    buf_ind = *to_send_list[target];
+
+         			    // ADD TO BUFFER nb_buffer
+                        *(nb_buffer[target]+buf_ind++)  = temp_id;
+                        *(nb_buffer[target]+buf_ind++)  = temp_type;
+                        *(nb_buffer[target]+buf_ind++)  = temp_mass;
+                        *(nb_buffer[target]+buf_ind++)  = temp_pos_x;
+                        *(nb_buffer[target]+buf_ind++)  = temp_pos_y;
+                        *(nb_buffer[target]+buf_ind++)  = temp_pos_z;
+                        *(nb_buffer[target]+buf_ind++)  = temp_vel_x;
+                        *(nb_buffer[target]+buf_ind++)  = temp_vel_y;
+                        *(nb_buffer[target]+buf_ind++)  = temp_vel_z;
+                        *(nb_buffer[target]+buf_ind++)  = temp_epot;
+
+                        // updating buffer size for every particle belongs to it
+                        *to_send_list[target] = buf_ind;
+         		    }
+
+         		    else{ // particles from my CPU
+
+         		        // defining particle attributes
+         		        (*(atom)).set_mynumber(fbuffer_id.at(i));
+         		        (*(atom)).set_mytype(fbuffer_type.at(i));
+         		        (*(atom)).set_mymass(fbuffer_mass.at(i));
+         		        (*(atom)).set_myposition(fbuffer_pos_x.at(i), fbuffer_pos_y.at(i), fbuffer_pos_z.at(i));
+         		        (*(atom)).set_myvelocity(fbuffer_vel_x.at(i),fbuffer_vel_y.at(i),fbuffer_vel_z.at(i));
+         		        (*(atom)).set_myepot(fbuffer_epot.at(i));
+
+         		        (**(catalog+8)).add_particle((*(atom)));
+
+                        // assign position
+           	            atom_pos[0] = (*(atom)).get_myposition().x;
+           	            atom_pos[1] = (*(atom)).get_myposition().y;
+           	            atom_pos[2] = (*(atom)).get_myposition().z;
+
+                 	    // global cell coordinate from particle position
+           	            atom_cell_glob_coord = get_particle_glob_coordinate(atom_pos,cell_dim);
+
+             		    // CPU global coordinate from cell global coordinate
+           	            atom_cpu_gcoord.x = atom_cell_glob_coord.x / cpu_cell_dim.x;
+           	            atom_cpu_gcoord.y = atom_cell_glob_coord.y / cpu_cell_dim.y;
+           	            atom_cpu_gcoord.z = atom_cell_glob_coord.z / cpu_cell_dim.z;
+
+             		    // get cell local coordinate
+           	            atom_cell_loc_coord = get_cell_loc_coord(atom_cell_glob_coord,atom_cpu_gcoord,cpu_cell_dim);
+
+                        (*(atom_cell_holder)) = (**(bobj)).cell_with_lcoord(atom_cell_loc_coord,atom_ncells);
+
+                        atom_cell_index = (*(atom_cell_holder)).get_cell_id();
+
+                        (*(atom_cell_holder)).add_particle((*(atom)));
+
+                        // updating/set added particle
+                        (**(bobj)).set_cell((*(atom_cell_holder)),atom_cell_index);
+
+         		    }
+
+                }// spherical wall check
+
+            } // for loop read data
+
+            delete atom_cell_holder;
+
+            // assign buffer size to each neighbor CPU
+
+	} // acceptance condition
+
+
+	else{ // rejected condition
+
+		    if(prank == test_rank){
+		    	celltype loc_cell;
+		    	cout<< "===============================================" << endl;
+		    	cout<< " --------------  After acceptance condition   ---------" << endl;
+		    	cout<< " " << endl;
+		        cout << "------- cell catalog check ---- " << endl;
+		        int loc_sum=0;
+		        for(int i=0; i<9; i++){
+		        	loc_cell = **(catalog+i);
+		        	cout << "no of particles in  **(catalog_list+" <<i<<") :" << loc_cell.get_nparticles() << endl;
+		        	loc_sum+=loc_cell.get_nparticles();
+		        }
+		        cout <<" total particles for neighbor : "<< loc_sum << endl;
+		        cout << "---------------------------------"<< endl;
+		        cout<< " " << endl;
+		    	cout<< "===============================================" << endl;
+
+		        cout<<"////////////////////////////////////////////" << endl;
+		        cout<<"-------      Before rejected condition       -------" << endl;
+		        long total_particles=0;
+		        for(int i=0; i<(**(bobj)).get_cell_list_size(); i++){
+		    	     total_particles += (**(bobj)).get_cell(i).get_nparticles();
+		        }
+		        cout << " total_particles  :  " << total_particles << endl;
+		        cout<<"////////////////////////////////////////////" << endl;
+		    }
+
+
+		// updating my part of CPU
+
+		particle* old_atom;         old_atom = new particle;
+		celltype* loc_cell_holder;  loc_cell_holder = new celltype;
+
+        ivec3d cpu_fact,cell_glob_coord,cell_loc_coord, nb_cpu_gcoord;
+        int loc_rank, target, cell_index, type_check;
+        double inst_pos[3];
+        int ncells_loc;
+
+        ncells_loc = (**(bobj)).get_cell_list_size();
+
+		for(long i=0; i< (**(catalog+8)).get_nparticles();i++){
+
+             (*(old_atom)) = (**(catalog+8)).get_particle(i);
+
+             // assign position
+             inst_pos[0] = (*(old_atom)).get_myposition().x;
+             inst_pos[1] = (*(old_atom)).get_myposition().y;
+             inst_pos[2] = (*(old_atom)).get_myposition().z;
+
+      	     // global cell coordinate from particle position
+     		 cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim);
+
+  		     // CPU global coordinate from cell global coordinate
+  		     nb_cpu_gcoord.x = cell_glob_coord.x / cpu_cell_dim.x;
+  		     nb_cpu_gcoord.y = cell_glob_coord.y / cpu_cell_dim.y;
+  		     nb_cpu_gcoord.z = cell_glob_coord.z / cpu_cell_dim.z;
+
+  		     // get cell local coordinate
+             cell_loc_coord = get_cell_loc_coord(cell_glob_coord,nb_cpu_gcoord,cpu_cell_dim);
+
+             (*(loc_cell_holder)) = (**(bobj)).cell_with_lcoord(cell_loc_coord,ncells_loc);
+
+             cell_index = (*(loc_cell_holder)).get_cell_id();
+
+             (*(loc_cell_holder)).add_particle((*(old_atom)));
+
+             // updating/set added particle
+             (**(bobj)).set_cell((*(loc_cell_holder)),cell_index);
+
+		}
+
+		// clear my sphere part
+		(**(catalog+8)).clear_all_particles();
+
+		delete old_atom; delete loc_cell_holder;
+
+	} // reject condition
+
+
+    if(prank == test_rank){
+    	celltype loc_cell;
+    	cout<< "===============================================" << endl;
+    	cout<< " --------------  After Rejection condition   ---------" << endl;
+    	cout<< " " << endl;
+        cout << "------- cell catalog check ---- " << endl;
+        int loc_sum=0;
+        for(int i=0; i<9; i++){
+        	loc_cell = **(catalog+i);
+        	cout << "no of particles in  **(catalog_list+" <<i<<") :" << loc_cell.get_nparticles() << endl;
+        	loc_sum+=loc_cell.get_nparticles();
+        }
+        cout <<" total particles for neighbor : "<< loc_sum << endl;
+        cout << "---------------------------------"<< endl;
+        cout<< " " << endl;
+    	cout<< "===============================================" << endl;
+
+        cout<<"////////////////////////////////////////////" << endl;
+        cout<<"-------      After rejected condition       -------" << endl;
+        long total_particles=0;
+        for(int i=0; i<(**(bobj)).get_cell_list_size(); i++){
+    	     total_particles += (**(bobj)).get_cell(i).get_nparticles();
+        }
+        cout << " total_particles  :  " << total_particles << endl;
+        cout<<"////////////////////////////////////////////" << endl;
+    }
+
+
+    //-----------------------------------------------------------------------------------------
+    //                                     Phase-3
+    //                      Communicating with neighbors regarding updated no of particles
+    //-----------------------------------------------------------------------------------------
+
+    // decision variables (no of particles) for all neighbors from whom I got sphere portions (to send)
+
+    long nb_dec_0=0, nb_dec_1=0, nb_dec_2=0, nb_dec_3=0, nb_dec_4=0, nb_dec_5=0, nb_dec_6=0;
+
+    long ** nb_decision; nb_decision = new long* [7];
+
+    nb_dec_0 = *to_send_list[0];  nb_dec_3 = *to_send_list[3];  nb_dec_6 = *to_send_list[6];
+    nb_dec_1 = *to_send_list[1];  nb_dec_4 = *to_send_list[4];
+    nb_dec_2 = *to_send_list[2];  nb_dec_5 = *to_send_list[5];
+
+    nb_decision[0] = &nb_dec_0; nb_decision[3] = &nb_dec_3; nb_decision[6] = &nb_dec_6;
+    nb_decision[1] = &nb_dec_1; nb_decision[4] = &nb_dec_4;
+    nb_decision[2] = &nb_dec_2; nb_decision[5] = &nb_dec_5;
+
+    // decision variables (no of particles) for all neighbors to whom I send my sphere portions (to receive)
+
+    long rec_dec_0=0, rec_dec_1=0, rec_dec_2=0, rec_dec_3=0, rec_dec_4=0, rec_dec_5=0, rec_dec_6=0;
+
+    long ** rec_decision; rec_decision = new long* [7];
+
+    rec_decision[0] = &rec_dec_0; rec_decision[3] = &rec_dec_3; rec_decision[6] = &rec_dec_6;
+    rec_decision[1] = &rec_dec_1; rec_decision[4] = &rec_dec_4;
+    rec_decision[2] = &rec_dec_2; rec_decision[5] = &rec_dec_5;
+
+    int send_id,rec_id;
+
+    //-------------------     Communication-1 ----------------------------------------------
+    // sending updated no of particles if any to my neighbors from whom I got sphere portions
+    //---------------------------------------------------------------------------------------
+
+   	if(prank == test_rank){
+   		cout << " Before communication with updated numbers" << endl;
+   		for(int i=0; i<7; i++){
+   			cout <<" *(rec_decision[ "<< i << "])  : " << *(rec_decision[i]) * 0.1 << endl;
+   		}
+   	}
+
+
+    for (int ind=0;ind<4;ind++){
+
+         if (z%2==0){ // if z is even
+
+           send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
+           MPI_Send(nb_decision[ind],1,MPI_LONG,send_id,10,comm_name);
+
+           rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+           MPI_Recv(rec_decision[ind],1,MPI_LONG,rec_id,11,comm_name,&stat);
+
+         }
+         else{       // if z is odd
+
+           rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
+           MPI_Recv(rec_decision[ind],1,MPI_LONG,rec_id,10,comm_name,&stat);
+
+           send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
+           MPI_Send(nb_decision[ind],1,MPI_LONG,send_id,11,comm_name);
+
+         }
+    }
+
+    // x direction communication
+    if (x%2 == 0){    // if x is even
+             // right & left comm
+
+    	   send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
+    	   MPI_Send(nb_decision[4],1,MPI_LONG,send_id,12,comm_name);
+
+           rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
+           MPI_Recv(rec_decision[4],1,MPI_LONG,rec_id,13,comm_name,&stat);
+
+           // top-right & bottom-left comm
+           send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
+           MPI_Send(nb_decision[5],1,MPI_LONG,send_id,14,comm_name);
+
+           rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
+           MPI_Recv(rec_decision[5],1,MPI_LONG,rec_id,15,comm_name,&stat);
+    }
+    else{ // if x is odd
+
+    	   rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
+    	   // right & left comm
+    	   MPI_Recv(rec_decision[4],1,MPI_LONG,rec_id,12,comm_name,&stat);
+
+           send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
+           MPI_Send(nb_decision[4],1,MPI_LONG,send_id,13,comm_name);
+
+  	       rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
+   	       // top-right & bottom-left comm
+   	       MPI_Recv(rec_decision[5],1,MPI_LONG,rec_id,14,comm_name,&stat);
+
+   	       send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
+   	       MPI_Send(nb_decision[5],1,MPI_LONG,send_id,15,comm_name);
+
+   	}
+
+   	// y direction communication
+
+   	if (y%2 == 0){      // if y is even
+   		   // top & bottom comm
+   		   send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
+   		   MPI_Send(nb_decision[6],1,MPI_LONG,send_id,16,comm_name);
+
+   	       rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
+   	       MPI_Recv(rec_decision[6],1,MPI_LONG,rec_id,17,comm_name,&stat);
+
+   	}
+   	else{              // if y is odd
+
+   		   rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
+   		   MPI_Recv(rec_decision[6],1,MPI_LONG,rec_id,16,comm_name,&stat);
+
+   	       send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
+   	       MPI_Send(nb_decision[6],1,MPI_LONG,send_id,17,comm_name);
+   	}
+
+
+   	if(prank == test_rank){
+   		cout << " After communication with updated numbers" << endl;
+   		for(int i=0; i<7; i++){
+   			cout <<" *(rec_decision[ "<< i << "])  : " << *(rec_decision[i]) * 0.1 << endl;
+   		}
+
+   	}
+    	//**************************************************************************************************
+        // buffer allocation part
+
+    // N1 N2 N4 N6 N3 N5 N7
+   	double *update_nb_0, *update_nb_1, *update_nb_2, *update_nb_3, *update_nb_4, *update_nb_5, *update_nb_6; // to be allocated and send
+
+    // allocate memory (to receive from neighbors)
+    update_nb_0 = new double [*(rec_decision[0])]; update_nb_1 = new double [*(rec_decision[1])];
+    update_nb_2 = new double [*(rec_decision[2])]; update_nb_3 = new double [*(rec_decision[3])];
+    update_nb_4 = new double [*(rec_decision[4])]; update_nb_5 = new double [*(rec_decision[5])];
+    update_nb_6 = new double [*(rec_decision[6])];
+//
+    double** rec_update_buf; rec_update_buf = new double* [7];
+
+    rec_update_buf[0] = update_nb_0; rec_update_buf[1] = update_nb_1; rec_update_buf[2] = update_nb_2;
+    rec_update_buf[3] = update_nb_3; rec_update_buf[4] = update_nb_4; rec_update_buf[5] = update_nb_5;
+    rec_update_buf[6] = update_nb_6;
+
+//
+    	// -------------------------   Communication - 2 ------------------------------------------
+    	//----------  sending the updated buffer to my neighbors from whom I got the sphere portion
+    	//-----------------------------------------------------------------------------------------
+
+    // synchronize communication
+    MPI_Barrier(comm_name);
+
+    // z direction
+
+    for (int i=0;i<4;i++){
+
+	   if (z%2==0){
+              // front comm
+
+              MPI_Send(nb_buffer[i],(*to_send_list[i]),MPI_DOUBLE,get_cpu_rank(x+x_send_phase[i],y+y_send_phase[i],z+z_send_phase[i],comm_name),18,comm_name);
+              MPI_Recv(rec_update_buf[i],(*rec_decision[i]),MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[i],y+y_recv_phase[i],z+z_recv_phase[i],comm_name),19,comm_name,&stat);
+            }
+            else{
+
+              MPI_Recv(rec_update_buf[i],(*rec_decision[i]),MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[i],y+y_recv_phase[i],z+z_recv_phase[i],comm_name),18,comm_name,&stat);
+              MPI_Send(nb_buffer[i],(*to_send_list[i]),MPI_DOUBLE,get_cpu_rank(x+x_send_phase[i],y+y_send_phase[i],z+z_send_phase[i],comm_name),19,comm_name);
+            }
+    } // loop  over neighbors (N1 N2 N4 N6)
+
+    // x direction communication
+    if (x%2 == 0){
+
+                // right & left comm
+             MPI_Send(nb_buffer[4],(*to_send_list[4]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name),20,comm_name);
+             MPI_Recv(rec_update_buf[4],(*rec_decision[4]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name),21,comm_name,&stat);
+
+             // top-right & bottom-left comm
+             MPI_Send(nb_buffer[5],(*to_send_list[5]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name),22,comm_name);
+             MPI_Recv(rec_update_buf[5],(*rec_decision[5]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name),23,comm_name,&stat);
+    }
+    else{
+
+             MPI_Recv(rec_update_buf[4],(*rec_decision[4]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name),20,comm_name,&stat);
+             MPI_Send(nb_buffer[4],(*to_send_list[4]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name),21,comm_name);
+
+             // top-right & bottom-left comm
+             MPI_Recv(rec_update_buf[5],(*rec_decision[5]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name),22,comm_name,&stat);
+             MPI_Send(nb_buffer[5],(*to_send_list[5]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name),23,comm_name);
+    }
+
+    // y direction communication
+    if (y%2 == 0){
+       	  // top & bottom comm
+             MPI_Send(nb_buffer[6],(*to_send_list[6]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name),24,comm_name);
+             MPI_Recv(rec_update_buf[6],(*rec_decision[6]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),25,comm_name,&stat);
+    }
+    else{
+             MPI_Recv(rec_update_buf[6],(*rec_decision[6]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),24,comm_name,&stat);
+             MPI_Send(nb_buffer[6],(*to_send_list[6]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name),25,comm_name);
+    }
+
+
+    //-----------------------------------------------------------------------------------------------
+    //                               Phase - 4 Update part of received buffers
+    //-----------------------------------------------------------------------------------------------
+
+    long val_count=0;
+    particle* update_atom; update_atom = new particle;
+
+	celltype* update_cell_holder;  update_cell_holder = new celltype;
+
+    // loop over my_received buffers and add particles to cellblock
+
+    long buf_ind;
+    double update_pos[3];
+    ivec3d my_cell_glob_coord, my_cell_loc_coord;
+    ivec3d my_cpu_gcoord;
+    int my_ncells=0; int my_cell_index=0;
+
+    my_ncells = (**(bobj)).get_cell_list_size();
+
+    // loop over all received neighbor and my sphere part
+    for( int j=0; j<7; j++){
+
+    	val_count = *(rec_decision[j]) * 0.1;
+
+    	// Delete catalog list and update received particles in cellblock
+
+    	if(val_count > 0){ // check for empty buffer
+
+    		// delete corresponding catloge list
+    		(**(catalog+(j+1))).clear_all_particles();
+
+    		// initialize for each buffer list
+    	    buf_ind = 0;
+
+    	    for (long i=0; i< val_count; i++){
+
+    	         (*(update_atom)).set_mynumber((long) *(rec_update_buf[j]+buf_ind++));
+    	         (*(update_atom)).set_mytype((int) *(rec_update_buf[j]+buf_ind++));
+    	         (*(update_atom)).set_mymass((double) *(rec_update_buf[j]+buf_ind++));
+
+    	         (*(update_atom)).set_myposition((double) *(rec_update_buf[j]+buf_ind++),(double) *(rec_update_buf[j]+buf_ind++),(double) *(rec_update_buf[j]+buf_ind++));
+    	         (*(update_atom)).set_myvelocity((double) *(rec_update_buf[j]+buf_ind++),(double) *(rec_update_buf[j]+buf_ind++),(double) *(rec_update_buf[j]+buf_ind++));
+    	         (*(update_atom)).set_myepot((double) *(rec_update_buf[j]+buf_ind++));
 
                  // assign position
-                 inst_pos[0] = old_atom.get_myposition().x; inst_pos[1] = old_atom.get_myposition().y; inst_pos[2] = old_atom.get_myposition().z;
+    	         update_pos[0] = (*(update_atom)).get_myposition().x;
+    	         update_pos[1] = (*(update_atom)).get_myposition().y;
+    	         update_pos[2] = (*(update_atom)).get_myposition().z;
 
           	     // global cell coordinate from particle position
-         		 cell_glob_coord = get_particle_glob_coordinate(inst_pos,cell_dim);
+         		 my_cell_glob_coord = get_particle_glob_coordinate(update_pos,cell_dim);
 
       		     // CPU global coordinate from cell global coordinate
-      		     nb_cpu_gcoord.x = cell_glob_coord.x / cpu_cell_dim.x;
-      		     nb_cpu_gcoord.y = cell_glob_coord.y / cpu_cell_dim.y;
-      		     nb_cpu_gcoord.z = cell_glob_coord.z / cpu_cell_dim.z;
+         		 my_cpu_gcoord.x = my_cell_glob_coord.x / cpu_cell_dim.x;
+         		 my_cpu_gcoord.y = my_cell_glob_coord.y / cpu_cell_dim.y;
+         		 my_cpu_gcoord.z = my_cell_glob_coord.z / cpu_cell_dim.z;
 
       		     // get cell local coordinate
-                 cell_loc_coord = get_cell_loc_coord(cell_glob_coord,nb_cpu_gcoord,cpu_cell_dim);
+         		 my_cell_loc_coord = get_cell_loc_coord(my_cell_glob_coord,my_cpu_gcoord,cpu_cell_dim);
 
-                 celltype loc_cell_holder = bobj.cell_with_lcoord(cell_loc_coord,ncells_loc);
+                 (*(update_cell_holder)) = (**(bobj)).cell_with_lcoord(my_cell_loc_coord,my_ncells);
 
-                 cell_index = loc_cell_holder.get_cell_id();
+                 my_cell_index = (*(update_cell_holder)).get_cell_id();
 
-                 loc_cell_holder.add_particle(old_atom);
+                 (*(update_cell_holder)).add_particle((*(update_atom)));
 
                  // updating/set added particle
-                 bobj.set_cell(loc_cell_holder,cell_index);
+                 (**(bobj)).set_cell((*(update_cell_holder)),my_cell_index);
+
+    	    }
+
+    	}
+
+    	// Update catalog list particles in cellblock
+    	else{
+
+
+    		for(long m=0; m<(**(catalog+(j+1))).get_nparticles(); m++ ){
+
+    			 (*(update_atom)) = (**(catalog+(j+1))).get_particle(m);
+
+                 // assign position
+    	         update_pos[0] = (*(update_atom)).get_myposition().x;
+    	         update_pos[1] = (*(update_atom)).get_myposition().y;
+    	         update_pos[2] = (*(update_atom)).get_myposition().z;
+
+          	     // global cell coordinate from particle position
+         		 my_cell_glob_coord = get_particle_glob_coordinate(update_pos,cell_dim);
+
+      		     // CPU global coordinate from cell global coordinate
+         		 my_cpu_gcoord.x = my_cell_glob_coord.x / cpu_cell_dim.x;
+         		 my_cpu_gcoord.y = my_cell_glob_coord.y / cpu_cell_dim.y;
+         		 my_cpu_gcoord.z = my_cell_glob_coord.z / cpu_cell_dim.z;
+
+      		     // get cell local coordinate
+         		 my_cell_loc_coord = get_cell_loc_coord(my_cell_glob_coord,my_cpu_gcoord,cpu_cell_dim);
+
+                 (*(update_cell_holder)) = (**(bobj)).cell_with_lcoord(my_cell_loc_coord,my_ncells);
+
+                 my_cell_index = (*(update_cell_holder)).get_cell_id();
+
+                 (*(update_cell_holder)).add_particle((*(update_atom)));
+
+                 // updating/set added particle
+                 (**(bobj)).set_cell((*(update_cell_holder)),my_cell_index);
 
     		}
+    		// clear this part
+    		(**(catalog+(j+1))).clear_all_particles();
 
-    	} // reject condition
+    	}
 
-        if(prank == test_rank){
-        	cout << " =================================================" << endl;
-            cout << " Updated neighbor particles After check " << endl;
-            cout << "  My rank : " << prank << endl;
-            cout << " =================================================" << endl;
-            int tot=0;
-        	for(int i=0; i<7; i++){
-                  cout << " to rank : "<< rec_nb_rank[i] << " and count :" << *to_send_list[i]*0.1<< endl;
-                  tot+= *to_send_list[i]*0.1;
-        	}
-        	cout <<"     Total sum : " << tot << endl;
-            cout << " ========================================" << endl;
-        	cout << "       Updated portion part               " << endl;
-        	cout << " ========================================" << endl;
-        	cout << "  Total particles added in updated portion part : " << new_portion.get_nparticles() << endl;
-        	cout << " =================================================" << endl;
-        }
+    }
 
+    // clear memory
+    fbuffer_id.clear();
+    fbuffer_type.clear();
+    fbuffer_mass.clear();
+    fbuffer_pos_x.clear();
+    fbuffer_pos_y.clear();
+    fbuffer_pos_z.clear();
+    fbuffer_vel_x.clear();
+    fbuffer_vel_y.clear();
+    fbuffer_vel_z.clear();
+    fbuffer_epot.clear();
+    fbuffer_eam_rho.clear();
 
+    (**(catalog+0)).clear_all_particles();
 
-        //-----------------------------------------------------------------------------------------
-        //                                     Phase-3
-        //                      Communicating with neighbors regarding updated no of particles
-        //-----------------------------------------------------------------------------------------
+    delete sphere_new;
+    delete updated_atom;
 
-        // decision variables for all neighbors from whom I got sphere portions (to send)
-        // [0]-no of particles
-        long nb_dec_0=0, nb_dec_1=0, nb_dec_2=0, nb_dec_3=0, nb_dec_4=0, nb_dec_5=0, nb_dec_6=0;
+    delete[] nb_0; delete[] nb_1;delete[] nb_2; delete[] nb_3;
+    delete[] nb_4;delete[] nb_5;delete[] nb_6;
 
-        long ** nb_decision;
-        nb_decision = new long* [7];
+    delete nb_buffer;
+    delete to_send_list;
 
-        nb_dec_0 = *to_send_list[0];
-        nb_dec_1 = *to_send_list[1];
-        nb_dec_2 = *to_send_list[2];
-        nb_dec_3 = *to_send_list[3];
-        nb_dec_4 = *to_send_list[4];
-        nb_dec_5 = *to_send_list[5];
-        nb_dec_6 = *to_send_list[6];
+    delete atom;
+    delete nb_decision; delete rec_decision;
 
-        nb_decision[0] = &nb_dec_0;
-        nb_decision[1] = &nb_dec_1;
-        nb_decision[2] = &nb_dec_2;
-        nb_decision[3] = &nb_dec_3;
-        nb_decision[4] = &nb_dec_4;
-        nb_decision[5] = &nb_dec_5;
-        nb_decision[6] = &nb_dec_6;
+    delete update_nb_0; delete update_nb_1; delete update_nb_2; delete update_nb_3;
+    delete update_nb_4; delete update_nb_5; delete update_nb_6;
 
+    delete rec_update_buf; delete update_cell_holder;
 
-        // to be tested and included
+    delete update_atom;
+}
 
-//        // decision variables for all neighbors from whom I got sphere portions (to send)
-//        // [0]-no of particles
-//        long rec_dec_0=0, rec_dec_1=0, rec_dec_2=0, rec_dec_3=0, rec_dec_4=0, rec_dec_5=0, rec_dec_6=0;
-//
-//        long ** rec_decision;
-//        rec_decision = new long* [7];
-//
-//        rec_decision[0] = &rec_dec_0;
-//        rec_decision[1] = &rec_dec_1;
-//        rec_decision[2] = &rec_dec_2;
-//        rec_decision[3] = &rec_dec_3;
-//        rec_decision[4] = &rec_dec_4;
-//        rec_decision[5] = &rec_dec_5;
-//        rec_decision[6] = &rec_dec_6;
-//
-//        int send_id,rec_id;
-//
-//        //-------------------     Communication-1 ----------------------------------------------
-//        // sending updated no of particles if any to my neighbors from whom I got sphere portions
-//        //---------------------------------------------------------------------------------------
-//
-//    	for (int ind=0;ind<4;ind++){
-//
-//    	     if (z%2==0){ // if z is even
-//
-//    	       send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
-//    	       MPI_Send(nb_decision[ind],1,MPI_LONG,send_id,10,comm_name);
-//
-//    	       rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
-//    	       MPI_Recv(rec_decision[ind],1,MPI_LONG,rec_id,11,comm_name,&stat);
-//
-//    	     }
-//    	     else{       // if z is odd
-//
-//    	       rec_id = get_cpu_rank(x+x_recv_phase[ind],y+y_recv_phase[ind],z+z_recv_phase[ind],comm_name);
-//    	       MPI_Recv(rec_decision[ind],1,MPI_LONG,rec_id,10,comm_name,&stat);
-//
-//    	       send_id = get_cpu_rank(x+x_send_phase[ind],y+y_send_phase[ind],z+z_send_phase[ind],comm_name);
-//    	       MPI_Send(nb_decision[ind],1,MPI_LONG,send_id,11,comm_name);
-//
-//    	     }
-//    	}
-//
-//    	// Next phase even-even or odd-odd communications
-//
-//    	if(prank == test_rank){
-//    		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
-//    		cout << "   MPI Communication in X direction     " << endl;
-//    		cout << "      "<< endl;
-//    	}
-//
-//    	// x direction communication
-//    	if (x%2 == 0){    // if x is even
-//    	         // right & left comm
-//
-//    		   send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
-//    		   MPI_Send(nb_decision[4],1,MPI_LONG,send_id,12,comm_name);
-//
-//    	       rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
-//    	       MPI_Recv(rec_decision[4],1,MPI_LONG,rec_id,13,comm_name,&stat);
-//
-//    	         // top-right & bottom-left comm
-//    	       send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
-//    	       MPI_Send(nb_decision[5],1,MPI_LONG,send_id,14,comm_name);
-//
-//    	       rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
-//    	       MPI_Recv(rec_decision[5],1,MPI_LONG,rec_id,15,comm_name,&stat);
-//
-//    	}
-//    	else{ // if x is odd
-//
-//    		   rec_id = get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name);
-//    		   // right & left comm
-//    		   MPI_Recv(rec_decision[4],1,MPI_LONG,rec_id,12,comm_name,&stat);
-//
-//    	       send_id = get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name);
-//    	       MPI_Send(nb_decision[4],1,MPI_LONG,send_id,13,comm_name);
-//
-//    	       rec_id = get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name);
-//    	       // top-right & bottom-left comm
-//    	       MPI_Recv(rec_decision[5],1,MPI_LONG,rec_id,14,comm_name,&stat);
-//
-//    	       send_id = get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name);
-//    	       MPI_Send(nb_decision[5],1,MPI_LONG,send_id,15,comm_name);
-//
-//    	}
-//
-//    	if(prank == test_rank){
-//    		cout << "  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   " << endl;
-//    		cout << "   MPI Communication in Y direction     " << endl;
-//    		cout << "      "<< endl;
-//    	}
-//
-//    	// y direction communication
-//
-//    	if (y%2 == 0){      // if y is even
-//
-//    		   send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
-//    		   // top & bottom comm
-//    		   MPI_Send(nb_decision[6],1,MPI_LONG,send_id,16,comm_name);
-//
-//    	       rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
-//    	       MPI_Recv(rec_decision[6],1,MPI_LONG,rec_id,17,comm_name,&stat);
-//
-//    	}
-//    	else{              // if y is odd
-//
-//    		   rec_id = get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name);
-//    		   MPI_Recv(rec_decision[6],1,MPI_LONG,rec_id,16,comm_name,&stat);
-//
-//    	       send_id = get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name);
-//    	       MPI_Send(nb_decision[6],1,MPI_LONG,send_id,17,comm_name);
-//    	}
-//
-//    	//**************************************************************************************************
-//
-//        // buffer allocation part
-//
-//    	// N1 N2 N4 N6 N3 N5 N7
-//    	double *update_nb_0, *update_nb_1, *update_nb_2, *update_nb_3, *update_nb_4, *update_nb_5, *update_nb_6; // to be allocated and send
-//
-//    	// allocate memory (to receive from neighbors)
-//
-//    	update_nb_0 = new double [*(rec_decision+0)]; update_nb_1= new double [*(rec_decision+1)];
-//    	update_nb_2 = new double [*(rec_decision+2)]; update_nb_3 = new double [*(rec_decision+3)];
-//    	update_nb_4 = new double [*(rec_decision+4)]; update_nb_5 = new double [*(rec_decision+5)];
-//    	update_nb_6 = new double [*(rec_decision+6)];
-//
-//    	double* rec_update_buf[7] = {update_nb_0,update_nb_1,update_nb_2,update_nb_3,update_nb_4,update_nb_5,update_nb_6};
-//
-//    	// -------------------------   Communication - 2 ------------------------------------------
-//    	//----------  sending the updated buffer to my neighbors from whom I got the sphere portion
-//    	//-----------------------------------------------------------------------------------------
-//
-//    	// synchronize communication
-//    	MPI_Barrier(comm_name);
-//
-//        // z direction
-//
-//    	for (int i=0;i<4;i++){
-//            if (z%2==0){
-//              // front comm
-//
-//              MPI_Send(nb_buffer[i],(*to_send_list[i]),MPI_DOUBLE,get_cpu_rank(x+x_send_phase[i],y+y_send_phase[i],z+z_send_phase[i],comm_name),18,comm_name);
-//              MPI_Recv(rec_update_buf[i],(*rec_decision[i]),MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[i],y+y_recv_phase[i],z+z_recv_phase[i],comm_name),19,comm_name,&stat);
-//            }
-//            else{
-//
-//              MPI_Recv(rec_update_buf[i],(*rec_decision[i]),MPI_DOUBLE,get_cpu_rank(x+x_recv_phase[i],y+y_recv_phase[i],z+z_recv_phase[i],comm_name),18,comm_name,&stat);
-//              MPI_Send(nb_buffer[i],(*to_send_list[i]),MPI_DOUBLE,get_cpu_rank(x+x_send_phase[i],y+y_send_phase[i],z+z_send_phase[i],comm_name),19,comm_name);
-//            }
-//        } // loop  over neighbors (N1 N2 N4 N6)
-//
-//        // Next phase even-even or odd-odd communications
-//
-//        // x direction communication
-//        if (x%2 == 0){
-//
-//                // right & left comm
-//              MPI_Send(nb_buffer[4],(*to_send_list[4]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name),20,comm_name);
-//              MPI_Recv(rec_update_buf[4],(*rec_decision[4]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name),21,comm_name,&stat);
-//
-//              // top-right & bottom-left comm
-//              MPI_Send(nb_buffer[5],(*to_send_list[5]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name),22,comm_name);
-//              MPI_Recv(rec_update_buf[5],(*rec_decision[5]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name),23,comm_name,&stat);
-//        }
-//        else{
-//
-//              MPI_Recv(rec_update_buf[4],(*rec_decision[4]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[0],y+y_recv_next[0],z+z_recv_next[0],comm_name),20,comm_name,&stat);
-//              MPI_Send(nb_buffer[4],(*to_send_list[4]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[0],y+y_send_next[0],z+z_send_next[0],comm_name),21,comm_name);
-//
-//              // top-right & bottom-left comm
-//              MPI_Recv(rec_update_buf[5],(*rec_decision[5]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[1],y+y_recv_next[1],z+z_recv_next[1],comm_name),22,comm_name,&stat);
-//              MPI_Send(nb_buffer[5],(*to_send_list[5]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[1],y+y_send_next[1],z+z_send_next[1],comm_name),23,comm_name);
-//        }
-//
-//        // y direction communication
-//        if (y%2 == 0){
-//        	  // top & bottom comm
-//              MPI_Send(nb_buffer[6],(*to_send_list[6]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name),24,comm_name);
-//              MPI_Recv(rec_update_buf[6],(*rec_decision[6]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),25,comm_name,&stat);
-//        }
-//        else{
-//              MPI_Recv(rec_update_buf[6],(*rec_decision[6]),MPI_DOUBLE,get_cpu_rank(x+x_recv_next[2],y+y_recv_next[2],z+z_recv_next[2],comm_name),24,comm_name,&stat);
-//              MPI_Send(nb_buffer[6],(*to_send_list[6]),MPI_DOUBLE,get_cpu_rank(x+x_send_next[2],y+y_send_next[2],z+z_send_next[2],comm_name),25,comm_name);
-//        }
-//
-//
-//    	// Delete buffer
-//    	delete[] update_nb_0;  delete[] update_nb_1; delete[] update_nb_2; delete[] update_nb_3;
-//    	delete[] update_nb_4;  delete[] update_nb_5; delete[] update_nb_6;
-
-
-    	// ---------------  End of untested code part -----------------------
-
-
-
-        // DELETE BUFFER MEMORY ACCORDINGLY
-        delete[] nb_0; delete[] nb_1;delete[] nb_2; delete[] nb_3;
-        delete[] nb_4;delete[] nb_5;delete[] nb_6;
-
-        read_block = bobj;
-        return read_block;
-
-
-} // End of read_update config
-
-
-
-int acceptance_check(int type,celltype* glob_old_sphere,celltype* glob_new_sphere){
+int acceptance_check(int type,celltype old_sphere,celltype new_sphere){
 
 	int flag=0,old_type,new_type;
 	double epot_old =0.0,epot_new =0.0, avg_epot_old =0.0, avg_epot_new = 0.0;
     long old_count=0, new_count=0;
-
-    celltype old_sphere = *glob_old_sphere;
-    celltype new_sphere = *glob_new_sphere;
 
 	// Energy computation
     if(type == 0){
@@ -3136,9 +3175,6 @@ int acceptance_check(int type,celltype* glob_old_sphere,celltype* glob_new_spher
                   // start from here
     			  if( old_type == 0 || old_type == 1 ){
     				  epot_old += old_sphere.get_particle(i).get_myepot();
-    				  //cout << " check here epot :" << epot_old << endl;
-    				  //cout << "old_sphere.get_particle(i).get_myepot()"<< old_sphere.get_particle(i).get_myepot()<< endl;
-
                       old_count++;
     			  }
 

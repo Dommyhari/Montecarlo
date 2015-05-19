@@ -98,11 +98,9 @@ class celltype{
         void set_particle(particle p,long cell_ind)     {  cell.at(cell_ind)=p;}
 
         // for performance make manipulations
-        //void delete_particle(particle p, int index)    { cell.erase(cell.begin()+ index);}
         void delete_particle(long index)    { cell.erase(cell.begin()+ index);}
 
         void delete_particle_id(long index);
-
 
 	    // get methods
 	    int get_cell_id()                       { return cell_id;       }  //  cell id

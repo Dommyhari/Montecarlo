@@ -31,30 +31,27 @@ ivec3d get_cell_loc_coord(ivec3d glob_coord, ivec3d cpu_glob_pos, ivec3d cpu_cel
 
 ivec3d get_particle_glob_coordinate(double* pos,vec3d mc_cell_phy_dim);
 
-cellblock make_cells(cellblock loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d gcoord,ivec3d cpu_cell_dim, int prank);
+void make_cells(cellblock** loc_obj,vec3d cpu_box_diag, vec3d cell_dim,ivec3d gcoord,ivec3d cpu_cell_dim, int prank);
 
-cellblock make_particles(cellblock loc_obj, long tatoms_cpu, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
+void make_particles(cellblock** loc_obj, long tatoms_cpu, ivec3d global_cell_dim, ivec3d loc_cpu_gcoord,ivec3d cpu_cell_dim,
 		vector<long> atomnumber,vector<int> atomtypes,vector<double> atommass,vector<double> positions,vector<double> epot,int prank,int debug,vec3d cell_dim);
 
-cellblock create_maxwell_velocities(cellblock loc_obj,double temp, ivec3d*  restriction, int prank,int debug);
+void create_maxwell_velocities(cellblock** loc_obj,double temp, ivec3d*  restriction, int prank,int debug);
 
 double get_gaussian(double sigma);
 
 int get_cpu_rank(int inde0,int inde1,int inde2, MPI_Comm c_name);
 
-particle sample_zone(cellblock bobj,int win_id,ivec3d cpu_cell_dim,int prank);
+particle sample_zone(cellblock** bobj,int win_id,ivec3d cpu_cell_dim,int prank);
 
-
-cellblock construct_sphere(particle pobj, cellblock bobj, int win_id,const char* filename,int prank,MPI_Comm comm_name, MPI_Status stat
+void construct_sphere(particle pobj, cellblock** bobj, int win_id,int prank,MPI_Comm comm_name, MPI_Status stat
 		,int test_rank,ivec3d cpu_dim,double* data_list,ivec3d cpu_cell_dim,celltype** catalog);
 
 void do_local_mdrun(string bin_name,string param_name,int prank);
 
-int acceptance_check(int type,celltype* old_sphere,celltype* new_sphere);
+int acceptance_check(int type,celltype old_sphere,celltype new_sphere);
 
-// new revision with catalog
-
-cellblock read_update_config (int win_id,particle pobj,cellblock bobj,double* data_list,int prank,int test_rank,
+void read_update_config (int win_id,particle pobj,cellblock** bobj,double* data_list,int prank,int test_rank,
 		vec3d cell_dim,ivec3d cpu_cell_dim,MPI_Status stat,MPI_Comm comm_name,celltype** catalog);
 
 double scalar_prod(vec3d u, vec3d v);

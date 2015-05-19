@@ -241,60 +241,119 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     		double **md_atommass,double **md_positions){
 
 	MPI_Barrier(comm_name); // for ordered printing
-
 	int accept_flag = 0; // acceptance flag
 	int win_id = 0;  // Hardcoded for testing
 	int test_cpu = 0;
-	int dbug_flag = 0;   // debug flag -- print check statements
-
+	int dbug_flag = 1;   // debug flag -- print check statements
 
 	// creating cellblock object
-	cellblock c_obj, r_cell,r_partic, r_vel;
+	cellblock c_obj;
+
+	// cellblock pointer
+	cellblock* cpu_block;
 
 	// CPU box dimension
 	vec3d cpu_box_diag;
 
 	cpu_box_diag.x = mc_cpu_box_x.x; cpu_box_diag.y = mc_cpu_box_y.y; cpu_box_diag.z = mc_cpu_box_z.z;
 
-	//ncells_cpu = calc_ncells_cpu(cpu_box_diag,mc_cell_dim);
 	c_obj.set_mycpu(mc_prank);
 
+	cpu_block = &c_obj;
+
+	if(mc_prank == test_cpu){
+	cout <<"===================================================" << endl;
+    cout << "           Before   make_cells check              " << endl;
+    cout <<"===================================================" << endl;
+	cout <<" c_obj.get_cell_list_size() :"<<c_obj.get_cell_list_size()<<endl;
+	cout <<" c_obj.get_mycpu() :"<<c_obj.get_mycpu()<<endl;
+	cout <<"===================================================" << endl;
+	}
+
 	// construct cells
-	r_cell = make_cells(c_obj,cpu_box_diag, mc_cell_dim,cpu_gcoord,mc_cpu_cell_dim,mc_prank);
+	make_cells(&cpu_block,cpu_box_diag, mc_cell_dim,cpu_gcoord,mc_cpu_cell_dim,mc_prank);
 
-	// create particles
-    r_partic = make_particles(r_cell,mc_tatoms_cpu, mc_global_cell_dim,cpu_gcoord,mc_cpu_cell_dim,
-        		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot,mc_prank,dbug_flag,mc_cell_dim);
+	if(mc_prank == test_cpu){
+	cout <<"===================================================" << endl;
+    cout << "           After   make_cells check              " << endl;
+    cout <<"===================================================" << endl;
+	cout <<" c_obj.get_cell_list_size() :"<<c_obj.get_cell_list_size()<<endl;
+	cout <<" c_obj.get_mycpu() :"<<c_obj.get_mycpu()<<endl;
+	cout <<" c_obj.get_cell(32).get_cell_id() "<<c_obj.get_cell(32).get_cell_id()<<endl;
+	cout <<" c_obj.get_cell(32).get_cell_loc_coord "<<c_obj.get_cell(32).get_cell_loc_coord().x<<" "
+			<<c_obj.get_cell(32).get_cell_loc_coord().y<<" "<<c_obj.get_cell(32).get_cell_loc_coord().z<<endl;
+	cout <<" c_obj.get_cell(32).get_cell_glob_coord "<<c_obj.get_cell(32).get_cell_glob_coord().x<<" "
+			<<c_obj.get_cell(32).get_cell_glob_coord().y<<" "<<c_obj.get_cell(32).get_cell_glob_coord().z<<endl;
 
+	cout <<"===================================================" << endl;
+	}
+
+    // create particles
+	make_particles(&cpu_block,mc_tatoms_cpu, mc_global_cell_dim,cpu_gcoord,mc_cpu_cell_dim,
+	        		mc_atomnumber,mc_atomtypes,mc_atommass,mc_positions,mc_epot,mc_prank,dbug_flag,mc_cell_dim);
+
+	if(mc_prank == test_cpu){
+
+    cout << "=============================================" << endl;
+	cout << "           After make_particles check        " << endl;
+    cout << "=============================================" << endl;
+
+    cout << " c_obj.get_cell(32).get_nparticles() "<<c_obj.get_cell(32).get_nparticles()<<endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_mynumber() " << c_obj.get_cell(32).get_particle(0).get_mynumber()<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_mytype() " << c_obj.get_cell(32).get_particle(0).get_mytype()<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_mymass() " << c_obj.get_cell(32).get_particle(0).get_mymass()<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myposition().x " << c_obj.get_cell(32).get_particle(0).get_myposition().x<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myposition().y " << c_obj.get_cell(32).get_particle(0).get_myposition().y<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myposition().z " << c_obj.get_cell(32).get_particle(0).get_myposition().z<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myepot() " << c_obj.get_cell(32).get_particle(0).get_myepot()<< endl;
+
+    cout << "=============================================" << endl;
+
+	}
     // clear STL container (once particle objects are created)
 
     // (NOT REQUIRED DURING TESTING PHASE -- INCLUDE LATER -- in sync with fill_mc_container)
-	mc_atomnumber.clear();
-	mc_atomtypes.clear();
-    mc_atommass.clear();
-    mc_positions.clear();
-    mc_epot.clear();
-
+//	mc_atomnumber.clear();
+//	mc_atomtypes.clear();
+//    mc_atommass.clear();
+//    mc_positions.clear();
+//    mc_epot.clear();
 
     // create velocities (T != 0K)
 	if(mc_temp>0){
-		//cellblock  r_vel = new cellblock;
-
-		r_vel = create_maxwell_velocities(r_partic,mc_temp,mc_restriction,mc_prank,dbug_flag);
-		r_partic = r_vel;
-
-		//delete r_vel;
+		create_maxwell_velocities(&cpu_block,mc_temp,mc_restriction,mc_prank,dbug_flag);
 	}
 
+	if(mc_prank == test_cpu){
+    cout << "=============================================" << endl;
+	cout << "           After Maxwell velocities check        " << endl;
+    cout << "=============================================" << endl;
+
+    cout << " c_obj.get_cell(32).get_nparticles() "<<c_obj.get_cell(32).get_nparticles()<<endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_mynumber() " << c_obj.get_cell(32).get_particle(0).get_mynumber()<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_mytype() " << c_obj.get_cell(32).get_particle(0).get_mytype()<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_mymass() " << c_obj.get_cell(32).get_particle(0).get_mymass()<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myposition().x " << c_obj.get_cell(32).get_particle(0).get_myposition().x<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myposition().y " << c_obj.get_cell(32).get_particle(0).get_myposition().y<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myposition().z " << c_obj.get_cell(32).get_particle(0).get_myposition().z<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myvelocity().x " << c_obj.get_cell(32).get_particle(0).get_myvelocity().x<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myvelocity().y " << c_obj.get_cell(32).get_particle(0).get_myvelocity().y<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myvelocity().z " << c_obj.get_cell(32).get_particle(0).get_myvelocity().z<< endl;
+    cout << " c_obj.get_cell(32).get_particle(0).get_myepot() " << c_obj.get_cell(32).get_particle(0).get_myepot()<< endl;
+
+    cout << "=============================================" << endl;
+	}
 
     // extend the fragment with random selector
     int sample_id= win_id;
 
     // particle instance -- sample zone method
-    particle rand_particle = sample_zone(r_partic,sample_id,mc_cpu_cell_dim,mc_prank);
+    particle rand_particle = sample_zone(&cpu_block,sample_id,mc_cpu_cell_dim,mc_prank);
 
     // data_list for sphere construction routine
     double* dat_list;
+    dat_list = new double [7];
+
     dat_list[0] = (mc_cpu_cell_dim.x/2 * mc_cpu_cell_dim.y/2 * mc_cpu_cell_dim.z/2 ); // no of cells
     dat_list[1] = mc_rsweep;        // sphere radius
     dat_list[2] = mc_sphere_wall;   // sphere wall thickness
@@ -303,55 +362,49 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
     dat_list[5] = mc_simbox_z.z;
     dat_list[6] = (double) mc_real_types;
 
-
     // some test case examples
 
     if((mc_prank==0)) {
     	rand_particle.set_myposition(2.8617,2.8651,1.4384); // 80x80x80 -win 0
 //    	//rand_particle.set_myposition(11.4372, 2.8651, 2.8677); // 300x300x300 -win 0
     }
-//
+
     if( (mc_prank==1)  ){
     	rand_particle.set_myposition(2.8617,2.8651,41.4575);
     }
-//
     if((mc_prank==2)){
     	rand_particle.set_myposition(4.2909,41.4549,1.4384);
     }
-//
     if((mc_prank==3)){
     	rand_particle.set_myposition(2.8617,42.8842,41.4575);
     }
-//
     if((mc_prank==4)){
     	rand_particle.set_myposition(44.3100,2.8651,2.8677);
     }
-//
     if((mc_prank==5)){
     	rand_particle.set_myposition(42.8808,2.8651,41.4575);
 //    	rand_particle.set_myposition(60.0318,21.4454,61.4671); // critical check
     }
-//
+
     if((mc_prank==6)){
     	rand_particle.set_myposition(42.8808,42.8842,1.4384);
     }
-//
+
     if((mc_prank==7)){
     	rand_particle.set_myposition(42.8808,42.8842,41.4575);
     }
 
 	// debug/control checking part
 
+    MPI_Barrier(comm_name);
     if(mc_prank == test_cpu){
-
 
        long tot_particles=0; // check variable
        cout << "****************************************************" << endl;
 
-       for(int i=0; i<r_partic.get_cell_list_size(); i++){
-    	     //cout << " No of particles in cell id  [ " << i << " ] : "<< r_partic.get_cell(i).get_nparticles()  << endl;
-    	     tot_particles += r_partic.get_cell(i).get_nparticles();
-
+       for(int i=0; i<c_obj.get_cell_list_size(); i++){
+    	     cout << " No of particles in cell id  [ " << i << " ] : "<< c_obj.get_cell(i).get_nparticles()  << endl;
+    	     tot_particles += c_obj.get_cell(i).get_nparticles();
        }
 
        cout << " Total particles allocated after MAKE CELLS in CPU 0 " << tot_particles << endl;
@@ -360,10 +413,8 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
    	   tot_particles=0; // check variable
        cout << "****************************************************" << endl;
 
-       for(int i=0; i<r_vel.get_cell_list_size(); i++){
-   	     //cout << " No of particles in cell id  [ " << i << " ] : "<< r_partic.get_cell(i).get_nparticles()  << endl;
-   	     tot_particles += r_vel.get_cell(i).get_nparticles();
-
+       for(int i=0; i<c_obj.get_cell_list_size(); i++){
+   	     tot_particles += c_obj.get_cell(i).get_nparticles();
        }
        cout << " Total particles allocated after VELOCITY COMPUTATION in CPU 0 " << tot_particles << endl;
        cout << "****************************************************" << endl;
@@ -382,94 +433,114 @@ extern "C" void do_montecarlo(int md_pid,long *md_tatoms_cpu,long **md_atomnumbe
 
 	}
 
+    MPI_Barrier(comm_name);
 
-    celltype sphr, nbr_1,nbr_2,nbr_3,nbr_4,nbr_5,nbr_6,nbr_7,my_list;
+    // celltype holders to store deleted particles during sphere construction
+    celltype* sphr;      sphr = new celltype;
+    celltype* nbr_1;     nbr_1= new celltype;
+    celltype* nbr_2;     nbr_2= new celltype;
+    celltype* nbr_3;     nbr_3= new celltype;
+    celltype* nbr_4;     nbr_4= new celltype;
+    celltype* nbr_5;     nbr_5= new celltype;
+    celltype* nbr_6;     nbr_6= new celltype;
+    celltype* nbr_7;     nbr_7= new celltype;
+    celltype* my_list; my_list= new celltype;
 
-    celltype* ptr_list[9]={&sphr,&nbr_1,&nbr_2,&nbr_3,&nbr_4,&nbr_5,&nbr_6,&nbr_7,&my_list};
+    celltype** ptr_list;
+    ptr_list = new celltype* [9];
 
-    // construct sphere
+    // assigning values
+    ptr_list[0] = sphr;  ptr_list[1] = nbr_1; ptr_list[2] = nbr_2; ptr_list[3] = nbr_3; ptr_list[4] = nbr_4; ptr_list[5] = nbr_5;
+    ptr_list[6] = nbr_6; ptr_list[7] = nbr_7; ptr_list[8] = my_list;
 
-    cellblock aft_sphere = construct_sphere(rand_particle, r_partic, win_id,file_name,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
-   		mc_cpu_cell_dim,ptr_list);
 
-    // run Local MD
+    // Construct sphere
+    construct_sphere(rand_particle, &cpu_block, win_id,mc_prank,comm_name,status,test_cpu,mc_cpu_dim,dat_list,
+            		mc_cpu_cell_dim,ptr_list);
+
+    //run local MD
     do_local_mdrun(md_binary,md_param,mc_prank);
 
-    // read or update config
 
-    cellblock loc_obj = read_update_config(win_id,rand_particle,aft_sphere,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
+   // read or update config
+    read_update_config(win_id,rand_particle,&cpu_block,dat_list,mc_prank,test_cpu,mc_cell_dim,mc_cpu_cell_dim,status,comm_name,ptr_list);
+
+    long total_particles=0;
+    for(int i=0; i<c_obj.get_cell_list_size(); i++){
+	     total_particles += c_obj.get_cell(i).get_nparticles();
+    }
+
+    cout << "###############################################################" << endl;
+    cout << " " <<endl;
+    cout << " Total particles allocated FAILURE CHECK in CPU : "<<mc_prank<<"  is " << total_particles << endl;
+    cout << " " <<endl;
+    cout << "###############################################################" << endl;
+
+
 
     // fill mc container
 
-    // edited // fill_mc_container(c_obj); // (this method could be defined locally here!!)
+    long n_particles=0;
+    long m=0;
 
-    vector<int> mod_mc_atomtypes;        //  vector container for atom types
-    vector<long> mod_mc_atomnumber;      //  vector container for atom number
-    vector<double> mod_mc_atommass;      //  vector container for atom mass
-    vector<double> mod_mc_positions;     //  vector container for atom positions
-    vector<double> mod_mc_velocities;    //  vector container for atom velocities
-    vector<double> mod_mc_epot;          //  vector container for atom potential energy
+    particle* atom_holder; atom_holder = new particle;
+
+    for (long count=0; count < c_obj.get_cell_list_size(); count++){ // loop over all cells
+
+    	// total no of particles
+    	n_particles = c_obj.get_cell(count).get_nparticles();
+
+    	for(long j=0; j<n_particles; j++){ // loop over all particles
+
+    		(*(atom_holder)) = c_obj.get_cell(count).get_particle(j);
+
+			// filling data container with corresponding values
+			mod_mc_atomnumber.push_back((*(atom_holder)).get_mynumber());
+			mod_mc_atomtypes.push_back((*(atom_holder)).get_mytype());
+			mod_mc_atommass.push_back((*(atom_holder)).get_mymass());
+			mod_mc_positions.push_back((*(atom_holder)).get_myposition().x);
+			mod_mc_positions.push_back((*(atom_holder)).get_myposition().y);
+			mod_mc_positions.push_back((*(atom_holder)).get_myposition().z);
+
+			mod_mc_velocities.push_back((*(atom_holder)).get_myvelocity().x);
+			mod_mc_velocities.push_back((*(atom_holder)).get_myvelocity().y);
+			mod_mc_velocities.push_back((*(atom_holder)).get_myvelocity().z);
+
+			mod_mc_epot.push_back((*(atom_holder)).get_myepot());
+    	}
+
+    }
 
 
-//	// loop over cells
-//
-//    celltype main_cell;
-//    particle main_part;
-//
-//	for (long i=0; i<loc_obj.get_cell_list_size();i++){
-//
-//		par_count = loc_obj.get_cell(i).get_nparticles();
-//
-//		for(long j=0; j<par_count;j++ ){
-//
-//			main_part = loc_obj.get_cell(i).get_particle(j);
-//
-//            // add particle attributes
-//			mod_mc_atomnumber.push_back(main_part.get_mynumber());    // atom id
-//			mod_mc_atomtypes.push_back(main_part.get_mytype());       // atom type
-//            mod_mc_atommass.push_back(main_part.get_mymass());        // atom mass
-//			mod_mc_positions.push_back(main_part.get_myposition().x);
-//			mod_mc_positions.push_back(main_part.get_myposition().y); // atom positions
-//			mod_mc_positions.push_back(main_part.get_myposition().z);
-//
-//			mod_mc_velocities.push_back(main_part.get_myvelocity().x);
-//			mod_mc_velocities.push_back(main_part.get_myvelocity().y); // atom velocities
-//			mod_mc_velocities.push_back(main_part.get_myvelocity().z);
-//
-//			mod_mc_epot.push_back(main_part.get_myepot());            // atom epot
-//
-//		}// loop over particle
-//
-//		// not required here -- declared in api using clear_all
-//		// delete all particles in cell
-//		loc_obj.get_cell(i).clear_all_particles();
-//
-//	}// loop over cells
-////
-//	// delete all cells
-//	loc_obj.clear_all_cells();
-
-    // clear created objects
-
-    // edited //for (long count=0; count < c_obj.get_ncells(); count++){
-        // clear all particles in cell
-    // edited //	c_obj.get_cell(count).clear_all_particles();
-    // edited // }
+    // clear all particles in cell
+    for (long count=0; count < c_obj.get_cell_list_size(); count++){
+        c_obj.get_cell(count).clear_all_particles(); }
 
     // clear all cells in cellblock
+    c_obj.clear_all_cells();
 
-    // edited // c_obj.clear_all_cells();
+    delete dat_list;
+    delete sphr; delete nbr_1; delete nbr_2; delete nbr_3; delete nbr_4; delete nbr_5; delete nbr_6; delete nbr_7; delete my_list;
+    delete ptr_list;
 
 	// Data mirroring procedure - Assigning pointers
+    long update_total = mod_mc_atomnumber.size(); // updated no of particles
 
 	md_pid         = mc_prank;              // process rank
-	md_tatoms_cpu  = &mc_tatoms_cpu;         // current total particles
+	//md_tatoms_cpu  = &mc_tatoms_cpu;         // current total particles
+
 
 	// preliminary pointer assignment
-	*md_atomnumber = mc_atomnumber.data();   // atom id
-    *md_atomtypes  = mc_atomtypes.data();    // atom types
-	*md_atommass   = mc_atommass.data();     // atom mass
-    *md_positions  = mc_positions.data();    // atom positions
+//	*md_atomnumber = mc_atomnumber.data();   // atom id
+//    *md_atomtypes  = mc_atomtypes.data();    // atom types
+//	*md_atommass   = mc_atommass.data();     // atom mass
+//    *md_positions  = mc_positions.data();    // atom positions
+
+	md_tatoms_cpu  = &update_total;              // current total particles
+	*md_atomnumber = mod_mc_atomnumber.data();   // atom id
+    *md_atomtypes  = mod_mc_atomtypes.data();    // atom types
+	*md_atommass   = mod_mc_atommass.data();     // atom mass
+    *md_positions  = mod_mc_positions.data();    // atom positions
 
     MPI_Barrier(comm_name); // for ordered printing
 
@@ -506,6 +577,14 @@ extern "C" void clean_montecarlo(){
 	mc_positions.clear();
 	mc_velocities.clear();
 	mc_epot.clear();
+
+	mod_mc_atomnumber.clear();
+	mod_mc_atomtypes.clear();
+	mod_mc_atommass.clear();
+	mod_mc_positions.clear();
+	mod_mc_velocities.clear();
+	mod_mc_epot.clear();
+
 
 	cout<<  " Some Post check       " <<endl;
 	cout<<  " size : mc_atomnumber  " << mc_atomnumber.size() << endl;
